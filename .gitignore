@@ -3,3 +3,5 @@
 /output
 *.out
 .vscode/
+*_output/
+*log
