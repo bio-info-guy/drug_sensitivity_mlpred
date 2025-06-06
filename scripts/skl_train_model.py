@@ -21,11 +21,14 @@ from sklearn.metrics import make_scorer
 from sklearn.metrics import accuracy_score
 from sklearn.tree import DecisionTreeClassifier
 from imblearn.over_sampling import RandomOverSampler, SMOTE
-from imblearn.pipeline import Pipeline, 
+from imblearn.pipeline import Pipeline, make_pipeline
+from sklearn.linear_model import SGDClassifier
+from lightgbm import LGBMClassifier
+import argparse
 
 
 
-def read_data(fpath):
+def read_data(fpath: str):
     dataset = pd.read_csv(fpath)
     X = dataset.iloc[:, 1:-4686]
     drug_y_all = dataset.iloc[:, -4686:]
@@ -34,27 +37,38 @@ def read_data(fpath):
 
 
 
- 
+# Define model names
+MODEL_TYPES= {
+		  'XGBClassifier': XGBClassifier,
+		  'RandomForestClassifier': RandomForestClassifier,
+		  'SGDClassifier': SGDClassifier,
+		  'LGBMClassifier': LGBMClassifier
+
+}
+
+
+# SOME PARAMETERS FOR GRIDSEARCH
 GRID_SEARCH_PARAM = {
-'XGB': {
+'xgboost': {
 		"n_estimators": [100, 150],
  },
- 'RF':{
+ 'rf':{
 	 "n_estimators": [100, 150, 250],
 	 "max_depth" : [20, 50, 100, 200],
  },
- 'SGD':{
+ 'sgd':{
 	 'l1_ratio':[0.2, 0.15, 0.1, 0.05],
 	 'alpha':[0.02, 0.05]
  }
 }
 
-# Basic function to handel sklearn and traditional model training and basic hpo
+# Basic function to handel sklearn and traditional model training and basic hyperparameter optimization
 # TODO refactor this into a class maybe, class DrugModel
-def skl_drug_model(X, Y, drug, model = XGBClassifier, oversample = True, fixed_params={}, search_params = {}, search_method = 'gridcv'):
+def skl_drug_model(X, Y, drug, model_name = 'xgboost', oversample = True, fixed_params={}, search_params = {}, search_method = 'gridcv'):
 
-	assert model in [XGBClassifier, RandomForestClassifier, SGDClassifier], f' {model} type not supported'
+	assert model_name in MODEL_TYPES, f' {model_name} type not supported'
 
+	model = MODEL_TYPES[model_name]
 	
 	y = Y[drug]
 
@@ -95,7 +109,8 @@ def skl_drug_model(X, Y, drug, model = XGBClassifier, oversample = True, fixed_p
 		best_params = {key.removeprefix('classifier__'):grid_imba.best_params_[key] for key in grid_imba.best_params_}
 		print(best_params)
 		model0.set_params(**best_params)
-	 
+	else:
+		grid_imba = None
 	 
 	if oversample:
 		imba_pipeline = Pipeline([('sampling', RandomOverSampler(random_state=72)), 
@@ -103,7 +118,9 @@ def skl_drug_model(X, Y, drug, model = XGBClassifier, oversample = True, fixed_p
 	else:
 		imba_pipeline = model0
 		  
-	#generate cross validation results of best model with correct oversampling 
+	# generate cross validation results of best model with correct oversampling 
+	# OVERSAMPLING must come after validation split for correct validation , thus the use of pipeline
+	# cross_validate function will first split into train/validate, then feed training data into pipeline (oversampling + training)
 	cv_results = cross_validate(imba_pipeline, X_train, y_train, cv=kfold, scoring= ['accuracy', 'precision', 'recall', 'f1', 'roc_auc'], n_jobs = 20)
 	cv_results = pd.DataFrame(cv_results)
 	
@@ -120,7 +137,7 @@ def skl_drug_model(X, Y, drug, model = XGBClassifier, oversample = True, fixed_p
 	final_results = {
 		'best_model': model0,
 		'drug': drug,
-		'model_class': model,
+		'model_class': model_name,
 		'model_search': grid_imba,
 		'search_method': search_method,
 		'X_test': X_test,
@@ -139,14 +156,9 @@ def write_drug_model_result(model_results, out_dir):
 	model0 = model_results['best_model']
 	oversample = 'oversample' if model_results['oversample'] else ''
 	drug = model_results['drug']
-	model_class = model_results['model_class']
+	model_name = model_results['model_class']
 
-	model_name = {
-		  XGBClassifier:'XGBClassifier',
-		  RandomForestClassifier:'RandomForestClassifier',
-		  SGDClassifier:'SGDClassifier'
-
-	}[model_class]
+	
 
 	full_out_dir = f'{out_dir}/{oversample}/{drug}/'
 	X_test, y_test = model_results['X_test'], model_results['Y_test']
@@ -160,7 +172,7 @@ def write_drug_model_result(model_results, out_dir):
 	model_results['cv_results'].to_csv(f'{full_out_dir}/{model_name}_cv_results_{drug}.csv')
 
 	print(drug,
-		 f'{model_class}_model_parameters', model0, "\n",
+		 f'{model_name}_model_parameters', model0, "\n",
 		 "confusion_matrix:", "\n", confusion_matrix(y_test, y_pred), "\n",
 		 file=open(f'{full_out_dir}/{model_name}_confusion_matrix.txt', "a"))
 
@@ -177,8 +189,30 @@ def write_drug_model_result(model_results, out_dir):
 	 
 
 	 # feature importance with XGBoost
-	if model_class in [XGBClassifier, RandomForestClassifier]:
+	if model_name in ['XGBClassifier','RandomForestClassifier']:
 		fi = pd.DataFrame({'feature': list(X_train.columns),
 					'importances': model0.feature_importances_ * 100}).\
 					 sort_values('importances', ascending = False)
 		fi.to_csv(f'{full_out_dir}/{model_name}_feature_importance_{drug}.csv')
+
+
+if __name__ == '__main__':
+	
+	parser = argparse.ArgumentParser(description="Train and evaluate drug sensitivity models.")
+	parser.add_argument("data_file", type=str, help="Path to input CSV data file")
+	parser.add_argument("drug_name", type=str, help="Drug name (column) to model")
+	parser.add_argument("model_type", type=str, choices=MODEL_TYPES.keys(), help="Model type")
+	parser.add_argument("out_dir", type=str, help="Output directory")
+	parser.add_argument("oversample", type=lambda x: (str(x).lower() == 'true'), help="Whether to use oversampling (True/False)")
+
+	args = parser.parse_args()
+
+	data_file = args.data_file
+	drug_name = args.drug_name
+	model_type = args.model_type
+	out_dir = args.out_dir
+	oversample = args.oversample
+
+	X, y, drugs = read_data(data_file)
+	results = skl_drug_model(X, y, drug = drug_name, model = model_type)
+	write_drug_model_result(results, out_dir = out_dir)
