@@ -1,0 +1,22 @@
+{
+    "model_type": "LGBMClassifier",
+    "use_oversampling": true,
+    "oversampler_type": "SMOTE",
+    "oversampler_seed": 42,
+    "train_test_split_seed": 20,
+    "cv_seed": 7,
+    "cv_splits": 5,
+    "scoring_metric": "roc_auc",
+    "search_method": "gridcv",
+    "fixed_params": {
+        "random_state": 42,
+        "verbose": -1,
+        "objective": "binary"
+    },
+    "grid_search_params": {
+        "n_estimators": [100, 200, 300],
+        "max_depth": [3, 6, 10, -1],
+        "learning_rate": [0.01, 0.1, 0.2],
+        "num_leaves": [31, 50, 100]
+    }
+}

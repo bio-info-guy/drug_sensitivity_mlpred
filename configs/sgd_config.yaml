@@ -1,0 +1,17 @@
+model_type: "SGDClassifier"
+use_oversampling: false
+oversampler_type: "SMOTE"
+oversampler_seed: 42
+train_test_split_seed: 20
+cv_seed: 7
+cv_splits: 5
+scoring_metric: "accuracy"
+search_method: "gridcv"
+fixed_params:
+  random_state: 42
+  loss: "hinge"
+  penalty: "elasticnet"
+grid_search_params:
+  l1_ratio: [0.05, 0.1, 0.15, 0.2]
+  alpha: [0.02, 0.05, 0.1]
+  max_iter: [1000, 2000]

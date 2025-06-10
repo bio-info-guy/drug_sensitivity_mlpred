@@ -1,0 +1,20 @@
+{
+    "model_type": "RandomForestClassifier",
+    "use_oversampling": true,
+    "oversampler_type": "RandomOverSampler",
+    "oversampler_seed": 42,
+    "train_test_split_seed": 20,
+    "cv_seed": 7,
+    "cv_splits": 5,
+    "scoring_metric": "f1",
+    "search_method": "gridcv",
+    "fixed_params": {
+        "random_state": 42
+    },
+    "grid_search_params": {
+        "n_estimators": [100, 150, 250],
+        "max_depth": [20, 50, 100, 200],
+        "min_samples_split": [2, 5, 10],
+        "min_samples_leaf": [1, 2, 4]
+    }
+}
