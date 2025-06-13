@@ -27,8 +27,17 @@ from lightgbm import LGBMClassifier
 import argparse
 import json
 import yaml
+import mlflow
+import mlflow.sklearn
 
 
+
+
+mlflow.create_experiment(
+    name="Drug_Sensitivity_Model_Training_test",
+    artifact_location="mlruns/Drug_Sensitivity_Model_Training_test"
+)
+mlflow.autolog()
 
 def read_data(fpath: str):
     dataset = pd.read_csv(fpath)
@@ -120,7 +129,7 @@ def skl_drug_model(X, Y, drug, config, n_cores=1):
     cv_seed = config.get('cv_seed', 7)
     cv_splits = config.get('cv_splits', 5)
     kfold = StratifiedKFold(n_splits=cv_splits, shuffle=True, random_state=cv_seed)
-
+    # kfold_outer = StratifiedKFold(n_splits=cv_splits, shuffle=True, random_state=cv_seed)
     # Get fixed parameters and search parameters
     fixed_params = config.get('fixed_params', {})
     search_params = config.get('grid_search_params', {})
@@ -143,7 +152,7 @@ def skl_drug_model(X, Y, drug, config, n_cores=1):
         grid_search_parameters = search_params
 
     # Initialize base model
-    model0 = model_class(**fixed_params)
+    model0 = model_class( **fixed_params)
 
     # Perform grid search if needed
     grid_imba = None
@@ -154,10 +163,13 @@ def skl_drug_model(X, Y, drug, config, n_cores=1):
             param_grid=grid_search_parameters, 
             cv=kfold, 
             scoring=scoring_metric,
-            return_train_score=True,
-            n_jobs=n_cores
+            return_train_score=True
         )
-        grid_imba.fit(X_train, y_train)
+
+        # outer loop of cv
+        # cv_results = cross_val_score(grid_imba, X_train, y_train, scoring=['accuracy', 'precision', 'recall', 'f1', 'roc_auc'], cv=kfold_outer,  n_jobs=n_cores)
+        with mlflow.start_run():
+            grid_imba.fit(X_train, y_train)
 
         # Extract best parameters
         if oversample_flag:
@@ -182,11 +194,12 @@ def skl_drug_model(X, Y, drug, config, n_cores=1):
     # Generate cross validation results of best model with correct oversampling 
     # OVERSAMPLING must come after validation split for correct validation, thus the use of pipeline
     # cross_validate function will first split into train/validate, then feed training data into pipeline (oversampling + training)
+    
     cv_results = cross_validate(
-        imba_pipeline, X_train, y_train, cv=kfold, 
-        scoring=['accuracy', 'precision', 'recall', 'f1', 'roc_auc'], 
-        n_jobs=n_cores
-    )
+    imba_pipeline, X_train, y_train, cv=kfold, 
+    scoring=['accuracy', 'precision', 'recall', 'f1', 'roc_auc'], 
+    n_jobs=n_cores
+     )
     cv_results = pd.DataFrame(cv_results)
 
     # Fit the classifier to the training data
@@ -246,7 +259,7 @@ def write_drug_model_result(model_results, out_dir):
 
 	 
 
-	 # feature importance with XGBoost
+	 # feature importance extraction
 	if model_name in ['XGBClassifier','RandomForestClassifier']:
 		fi = pd.DataFrame({'feature': list(X_train.columns),
 					'importances': model0.feature_importances_ * 100}).\
