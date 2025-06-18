@@ -144,7 +144,7 @@ def skl_drug_model(X, Y, drug, config, n_cores=1):
     kfold_inner = StratifiedKFold(n_splits=cv_splits, shuffle=True, random_state=cv_seed*2)
     if search_method == 'gridcv' and search_params:
         scoring_metric = config.get('scoring_metric', 'average_precision')
-        grid_imba=HalvingRandomSearchCV(imba_pipeline, param_distributions=grid_search_parameters, cv=kfold_inner, scoring=scoring_metric )
+        grid_imba=HalvingRandomSearchCV(imba_pipeline, param_distributions=grid_search_parameters, cv=kfold_inner, scoring=scoring_metric)
         cv_results = cross_validate(grid_imba, X, y, scoring=['balanced_accuracy', 'precision', 'recall', 'f1', 'average_precision', 'roc_auc'], cv=kfold_outer, verbose = 1)
 
               # outer loop of cv skl  
@@ -166,7 +166,7 @@ def skl_drug_model(X, Y, drug, config, n_cores=1):
                           for key in grid_imba.best_params_}
         else:
             best_params = grid_imba.best_params_
-
+        best_params['n_jobs'] = n_cores
         print(f"Best parameters for {drug}: {best_params}")
         model0.set_params(**best_params)
     else:
