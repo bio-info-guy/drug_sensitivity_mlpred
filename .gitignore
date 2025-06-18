@@ -7,3 +7,5 @@
 *log
 new_data/
 /mlruns/
+/test_out/
+*.pyc

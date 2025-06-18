@@ -1,5 +1,6 @@
 import os
 import sys
+sys.path.append('/local/projects-t3/lilab/yangqisu/repos/drug_sensitivity_mlpred/')
 import time
 import joblib
 import pandas as pd
@@ -27,13 +28,9 @@ from imblearn.pipeline import Pipeline, make_pipeline
 from sklearn.linear_model import SGDClassifier
 from lightgbm import LGBMClassifier
 import argparse
-import json
-import yaml
 import mlflow
 import mlflow.sklearn
-
-
-
+from utils.config_loader import load_config, MODEL_TYPES, OVERSAMPLER_TYPES # Import from new module
 
 #mlflow.create_experiment(
  #   name="Drug_Sensitivity_Model_Training_test",
@@ -63,8 +60,6 @@ def read_data(fpath: str):
     
     return X, drug_y_all, drug_list
 
-
-
 # Define model names
 MODEL_TYPES = {
     'XGBClassifier': XGBClassifier,
@@ -78,34 +73,6 @@ OVERSAMPLER_TYPES = {
     'RandomOverSampler': RandomOverSampler,
     'SMOTE': SMOTE
 }
-
-
-def load_config(config_file):
-    """Load configuration from JSON or YAML file."""
-    with open(config_file, 'r') as f:
-        if config_file.endswith('.json'):
-            config = json.load(f)
-        elif config_file.endswith(('.yml', '.yaml')):
-            config = yaml.safe_load(f)
-        else:
-            raise ValueError("Config file must be JSON (.json) or YAML (.yml/.yaml)")
-    
-    # Validate required fields
-    required_fields = ['model_type', 'grid_search_params', 'use_oversampling', 
-                      'oversampler_type', 'oversampler_seed', 'train_test_split_seed']
-    for field in required_fields:
-        if field not in config:
-            raise ValueError(f"Missing required field in config: {field}")
-    
-    # Validate model type
-    if config['model_type'] not in MODEL_TYPES:
-        raise ValueError(f"Unsupported model type: {config['model_type']}. Supported: {list(MODEL_TYPES.keys())}")
-    
-    # Validate oversampler type
-    if config['use_oversampling'] and config['oversampler_type'] not in OVERSAMPLER_TYPES:
-        raise ValueError(f"Unsupported oversampler type: {config['oversampler_type']}. Supported: {list(OVERSAMPLER_TYPES.keys())}")
-    
-    return config
 
 # Basic function to handle sklearn and traditional model training and basic hyperparameter optimization
 # TODO refactor this into a class maybe, class DrugModel
@@ -176,9 +143,9 @@ def skl_drug_model(X, Y, drug, config, n_cores=1):
     kfold_outer = StratifiedKFold(n_splits=cv_splits, shuffle=True, random_state=cv_seed)
     kfold_inner = StratifiedKFold(n_splits=cv_splits, shuffle=True, random_state=cv_seed*2)
     if search_method == 'gridcv' and search_params:
-        scoring_metric = config.get('scoring_metric', 'precision')
+        scoring_metric = config.get('scoring_metric', 'average_precision')
         grid_imba=HalvingRandomSearchCV(imba_pipeline, param_distributions=grid_search_parameters, cv=kfold_inner, scoring=scoring_metric )
-        cv_results = cross_validate(grid_imba, X, y, scoring=['accuracy', 'precision', 'recall', 'f1', 'roc_auc'], cv=kfold_outer,  n_jobs=n_cores)
+        cv_results = cross_validate(grid_imba, X, y, scoring=['balanced_accuracy', 'precision', 'recall', 'f1', 'average_precision', 'roc_auc'], cv=kfold_outer, verbose = 1)
 
               # outer loop of cv skl  
         #with mlflow.start_run():
@@ -203,7 +170,7 @@ def skl_drug_model(X, Y, drug, config, n_cores=1):
         print(f"Best parameters for {drug}: {best_params}")
         model0.set_params(**best_params)
     else:
-        cv_results = cross_validate(imba_pipeline, X_train, y_train, scoring = ['accuracy', 'precision', 'recall', 'f1', 'roc_auc'], cv=kfold, njobs = n_cores)
+        cv_results = cross_validate(imba_pipeline, X_train, y_train, scoring = ['balanced_accuracy',  'precision', 'average_precision', 'recall', 'f1', 'roc_auc'], cv=kfold_outer)
     # Set up final pipeline for cross-validation
     if oversample_flag:
         final_oversampler = oversampler_class(random_state=config['oversampler_seed'])

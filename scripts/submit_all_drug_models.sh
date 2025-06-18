@@ -5,7 +5,7 @@ DATA_FILE="input/combined_DepMap_21Q3.csv"
 CONFIG_FILE="configs/xgb_config.json"
 OUT_DIR="output/skl_models"
 SLURM_LOGS_DIR="slurm_logs"
-N_CORES=22
+N_CORES=24
 
 # Parse named arguments
 while [[ "$#" -gt 0 ]]; do
@@ -57,7 +57,7 @@ mkdir -p "${OUT_DIR}"
 
 # Calculate CPU and memory allocation
 CPUS_PER_TASK=$((N_CORES + 1))
-MEMORY="24G"
+MEMORY="32G"
 
 echo "Using parameters:"
 echo "  Data File: ${DATA_FILE}"
@@ -91,7 +91,7 @@ cat > "${SLURM_JOB_SCRIPT}" <<EOF
 #SBATCH --job-name=skl_drug_model_array
 #SBATCH --output=${SLURM_LOGS_DIR}/skl_drug_model_array_%A_%a.out
 #SBATCH --error=${SLURM_LOGS_DIR}/skl_drug_model_array_%A_%a.err
-#SBATCH --time=02:00:00
+#SBATCH --time=05:00:00
 #SBATCH --mem=${MEMORY}
 #SBATCH --account=ihc
 #SBATCH --nodes=1
