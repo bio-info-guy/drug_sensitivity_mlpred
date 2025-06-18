@@ -1,0 +1,6 @@
+{
+    "task": "classification",
+    "time_budget": 3600,
+    "metric": "ap",
+    "estimator_list": ["lgbm", "xgboost", "sgd", "lrl2", "svc"]
+}

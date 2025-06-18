@@ -3,7 +3,12 @@ import pandas as pd
 import json
 import os
 import joblib
+import sys
 from flaml import AutoML
+
+# Add utils directory to path to import config_loader
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'utils'))
+from config_loader import load_flaml_config
 
 def main():
     parser = argparse.ArgumentParser(description="Train a FLAML model for drug sensitivity prediction.")
@@ -33,8 +38,7 @@ def main():
     print(f"Features shape: {X.shape}, Target shape: {y.shape}")
 
     print(f"Loading model configuration from {args.config_file}...")
-    with open(args.config_file, 'r') as f:
-        model_config = json.load(f)
+    model_config = load_flaml_config(args.config_file)
 
     automl = AutoML()
 

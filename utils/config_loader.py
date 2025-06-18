@@ -16,6 +16,12 @@ OVERSAMPLER_TYPES = {
     'SMOTE': None
 }
 
+# Define FLAML supported tasks and estimators
+FLAML_TASKS = ['classification', 'regression']
+FLAML_ESTIMATORS = ['lgbm', 'xgboost', 'xgb_limitdepth', 'rf', 'extra_tree', 'lrl1', 'lrl2', 
+                   'catboost', 'kneighbor', 'prophet', 'arima', 'sarimax', 'holt-winters',
+                   'sgd', 'svc', 'nb', 'dt']
+
 def _parse_distribution(dist_str):
     """Parses a string representation of a scipy.stats distribution."""
     parts = dist_str.split('(')
@@ -58,5 +64,43 @@ def load_config(config_file):
         for param, value in config['grid_search_params'].items():
             if isinstance(value, str) and value.startswith(('uniform(', 'beta(', 'norm(', 'randint(', 'expon(', 'lognorm(')):
                 config['grid_search_params'][param] = _parse_distribution(value)
+    
+    return config
+
+def load_flaml_config(config_file):
+    """Load FLAML configuration from JSON or YAML file."""
+    with open(config_file, 'r') as f:
+        if config_file.endswith('.json'):
+            config = json.load(f)
+        elif config_file.endswith(('.yml', '.yaml')):
+            config = yaml.safe_load(f)
+        else:
+            raise ValueError("Config file must be JSON (.json) or YAML (.yml/.yaml)")
+    
+    # Validate required fields for FLAML
+    required_fields = ['task', 'time_budget', 'metric']
+    for field in required_fields:
+        if field not in config:
+            raise ValueError(f"Missing required field in FLAML config: {field}")
+    
+    # Validate task type
+    if config['task'] not in FLAML_TASKS:
+        raise ValueError(f"Unsupported FLAML task: {config['task']}. Supported: {FLAML_TASKS}")
+    
+    # Validate estimator list if provided
+    if 'estimator_list' in config:
+        if not isinstance(config['estimator_list'], list):
+            raise ValueError("estimator_list must be a list")
+        for estimator in config['estimator_list']:
+            if estimator not in FLAML_ESTIMATORS:
+                raise ValueError(f"Unsupported FLAML estimator: {estimator}. Supported: {FLAML_ESTIMATORS}")
+    
+    # Validate time_budget
+    if not isinstance(config['time_budget'], (int, float)) or config['time_budget'] <= 0:
+        raise ValueError("time_budget must be a positive number")
+    
+    # Validate metric is a string
+    if not isinstance(config['metric'], str):
+        raise ValueError("metric must be a string")
     
     return config
