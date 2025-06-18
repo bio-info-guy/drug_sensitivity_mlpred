@@ -3,9 +3,12 @@ import sys
 
 def get_drug_list(data_file):
     dataset = pd.read_csv(data_file)
-    # Assuming the last 4686 columns are drug sensitivity data
-    # This number comes from the skl_train_model.py script
-    drug_y_all = dataset.iloc[:, -4686:]
+    # Dynamically determine drug columns based on pattern in column names
+    all_columns = dataset.columns.tolist()
+    drug_columns = [col for col in all_columns if col.startswith('BRD-')]
+    
+    # Use the identified drug columns to select data
+    drug_y_all = dataset[drug_columns]
     drug_list = drug_y_all.columns.tolist()
     for drug in drug_list:
         print(drug)

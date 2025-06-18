@@ -5,7 +5,7 @@ DATA_FILE="input/combined_DepMap_21Q3.csv"
 CONFIG_FILE="configs/xgb_config.json"
 OUT_DIR="output/skl_models"
 SLURM_LOGS_DIR="slurm_logs"
-N_CORES=1
+N_CORES=22
 
 # Parse named arguments
 while [[ "$#" -gt 0 ]]; do
@@ -29,6 +29,19 @@ while [[ "$#" -gt 0 ]]; do
         --n-cores)
             N_CORES="$2"
             shift
+            ;;
+        -h|--help)
+            echo "Usage: $0 [OPTIONS]"
+            echo "Submit a Slurm job array to train scikit-learn drug sensitivity models."
+            echo ""
+            echo "Options:"
+            echo "  --data <file>         Path to the combined data file (default: input/combined_DepMap_21Q3.csv)"
+            echo "  --config <file>       Path to the model configuration file (default: configs/xgb_config.json)"
+            echo "  --out-dir <dir>       Directory to save trained models (default: output/skl_models)"
+            echo "  --slurm-logs-dir <dir> Directory to save Slurm logs (default: slurm_logs)"
+            echo "  --n-cores <num>       Number of CPU cores to use per task (default: 1)"
+            echo "  -h, --help            Display this help message and exit"
+            exit 0
             ;;
         *)
             echo "Unknown parameter passed: $1"
@@ -78,14 +91,19 @@ cat > "${SLURM_JOB_SCRIPT}" <<EOF
 #SBATCH --job-name=skl_drug_model_array
 #SBATCH --output=${SLURM_LOGS_DIR}/skl_drug_model_array_%A_%a.out
 #SBATCH --error=${SLURM_LOGS_DIR}/skl_drug_model_array_%A_%a.err
-#SBATCH --time=04:00:00
+#SBATCH --time=02:00:00
 #SBATCH --mem=${MEMORY}
+#SBATCH --account=ihc
+#SBATCH --nodes=1
+#SBATCH --partition=all,ihc
 #SBATCH --cpus-per-task=${CPUS_PER_TASK}
 #SBATCH --array=0-${ARRAY_MAX_INDEX}
 
-# Load necessary modules (e.g., anaconda/miniconda)
-# module load anaconda/2023.03 # Example, adjust as needed
-# source activate your_env # Example, activate your conda environment
+# Initialize Mamba (if not already initialized)
+eval "$(mamba shell.bash hook)"
+
+# Activate your Mamba environment (replace 'your_env' with your actual environment name)
+mamba activate drug_pred_ml
 
 # Define paths and parameters (these are passed from the submission script)
 DATA_FILE="${DATA_FILE}"
@@ -112,6 +130,8 @@ python scripts/skl_train_model.py \\
     --config_file "\${CONFIG_FILE}" \\
     --out_dir "\${OUT_DIR}" \\
     --n_cores "\${N_CORES}"
+
+
 
 echo "Finished job for drug: \${CURRENT_DRUG}"
 EOF
