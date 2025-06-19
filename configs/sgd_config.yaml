@@ -12,6 +12,14 @@ fixed_params:
   loss: "hinge"
   penalty: "elasticnet"
 grid_search_params:
-  l1_ratio: "uniform(0.0, 1.0)"
-  alpha: "lognorm(0.0, 1.0)"
+  l1_ratio: "uniform(0.0, 1.0)" # This looks like a distribution, for grid search it should be a list e.g. [0.1, 0.5, 0.9]
+  alpha: "lognorm(0.0, 1.0)" # This looks like a distribution, for grid search it should be a list e.g. [0.0001, 0.001, 0.01]
   max_iter: [1000, 2000]
+halving_search_params:
+  l1_ratio: [0.0, 0.25, 0.5, 0.75, 1.0]
+  alpha: [0.00001, 0.0001, 0.001, 0.01, 0.1]
+  max_iter: [1000, 1500, 2000, 2500]
+optuna_search_params:
+  l1_ratio: "optuna.distributions.FloatDistribution(0.0, 1.0)"
+  alpha: "optuna.distributions.FloatDistribution(1e-5, 1e-1, log=True)"
+  max_iter: "optuna.distributions.IntDistribution(1000, 3000)"

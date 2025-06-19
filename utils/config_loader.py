@@ -1,6 +1,11 @@
 import json
 import yaml
 from scipy.stats import uniform, beta, norm, randint, expon, lognorm
+try:
+    import optuna
+    OPTUNA_AVAILABLE = True
+except ImportError:
+    OPTUNA_AVAILABLE = False
 
 # Define model names (these will be needed for validation in load_config)
 MODEL_TYPES = {
@@ -34,6 +39,36 @@ def _parse_distribution(dist_str):
     
     return globals()[dist_name](*dist_args)
 
+def _parse_optuna_distribution(dist_str):
+    """Parses a string representation of an optuna distribution."""
+    if not OPTUNA_AVAILABLE:
+        raise ImportError("Optuna is not available. Please install optuna to use optuna distributions.")
+    
+    # Remove 'optuna.distributions.' prefix if present
+    if dist_str.startswith('optuna.distributions.'):
+        dist_str = dist_str[len('optuna.distributions.'):]
+    
+    # Parse the distribution
+    if dist_str.startswith('FloatDistribution('):
+        args_str = dist_str[len('FloatDistribution('):-1]
+        args = [float(arg.strip()) for arg in args_str.split(',')]
+        return optuna.distributions.FloatDistribution(*args)
+    elif dist_str.startswith('IntDistribution('):
+        args_str = dist_str[len('IntDistribution('):-1]
+        args = [int(arg.strip()) for arg in args_str.split(',')]
+        return optuna.distributions.IntDistribution(*args)
+    elif dist_str.startswith('CategoricalDistribution('):
+        args_str = dist_str[len('CategoricalDistribution('):-1]
+        # Handle list of categories
+        if args_str.startswith('[') and args_str.endswith(']'):
+            args_str = args_str[1:-1]
+            categories = [arg.strip().strip('"\'') for arg in args_str.split(',')]
+        else:
+            categories = [args_str.strip().strip('"\'')]
+        return optuna.distributions.CategoricalDistribution(categories)
+    else:
+        raise ValueError(f"Unsupported optuna distribution: {dist_str}")
+
 def load_config(config_file):
     """Load configuration from JSON or YAML file."""
     with open(config_file, 'r') as f:
@@ -45,7 +80,7 @@ def load_config(config_file):
             raise ValueError("Config file must be JSON (.json) or YAML (.yml/.yaml)")
     
     # Validate required fields
-    required_fields = ['model_type', 'grid_search_params', 'use_oversampling', 
+    required_fields = ['model_type', 'use_oversampling', 
                       'oversampler_type', 'oversampler_seed', 'train_test_split_seed']
     for field in required_fields:
         if field not in config:
@@ -59,11 +94,39 @@ def load_config(config_file):
     if config['use_oversampling'] and config['oversampler_type'] not in OVERSAMPLER_TYPES:
         raise ValueError(f"Unsupported oversampler type: {config['oversampler_type']}. Supported: {list(OVERSAMPLER_TYPES.keys())}")
 
-    # Parse scipy distributions in grid_search_params
-    if 'grid_search_params' in config:
-        for param, value in config['grid_search_params'].items():
+    # Get search method and validate
+    search_method = config.get('search_method', 'gridcv')
+    valid_search_methods = ['gridcv', 'halvingrandomsearch', 'optuna']
+    if search_method not in valid_search_methods:
+        raise ValueError(f"Unsupported search method: {search_method}. Supported: {valid_search_methods}")
+    
+    # Determine which search parameters to use based on search method
+    search_params_key = f"{search_method.replace('cv', '').replace('search', '')}_search_params"
+    if search_method == 'gridcv':
+        search_params_key = 'grid_search_params'
+    elif search_method == 'halvingrandomsearch':
+        search_params_key = 'halving_search_params'
+    elif search_method == 'optuna':
+        search_params_key = 'optuna_search_params'
+    
+    # Validate that the required search params exist
+    if search_params_key not in config:
+        raise ValueError(f"Missing search parameters for method '{search_method}': {search_params_key}")
+    
+    # Parse distributions based on search method
+    if search_method in ['gridcv', 'halvingrandomsearch']:
+        # Parse scipy distributions for grid and halving search
+        for param, value in config[search_params_key].items():
             if isinstance(value, str) and value.startswith(('uniform(', 'beta(', 'norm(', 'randint(', 'expon(', 'lognorm(')):
-                config['grid_search_params'][param] = _parse_distribution(value)
+                config[search_params_key][param] = _parse_distribution(value)
+    elif search_method == 'optuna':
+        # Parse optuna distributions
+        for param, value in config[search_params_key].items():
+            if isinstance(value, str) and 'optuna.distributions.' in value:
+                config[search_params_key][param] = _parse_optuna_distribution(value)
+    
+    # Add the active search parameters to the config for easy access
+    config['search_params'] = config[search_params_key]
     
     return config
 
