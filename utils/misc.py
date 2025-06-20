@@ -14,4 +14,10 @@ def hash_string_to_8_digits(input_string):
     return int(hex_digest, 16) % (10**8)
 
 def random_name(config, X, y):
-    return(generate_name(seed=hash_string_to_8_digits(str(config))+hash_string_to_8_digits(str(X))+hash_string_to_8_digits(str(y))))
+    config_hash = hash_string_to_8_digits(str(config))
+    X_hash = hash_string_to_8_digits(str(X.sum().sum()))
+    y_hash = hash_string_to_8_digits(str(y.sum().sum()))
+    print(config_hash)
+    print(X_hash)
+    print(y_hash)
+    return(generate_name(seed=config_hash+X_hash+y_hash))
