@@ -10,3 +10,4 @@ new_data/
 /test_out/
 *.pyc
 /test_out1/
+*png

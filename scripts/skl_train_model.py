@@ -37,6 +37,7 @@ from utils.config_loader import load_config, MODEL_TYPES, OVERSAMPLER_TYPES # Im
 from cross_validation_utils import outer_cross_validate
 from utils.misc import dummy_gc, random_name
 from customio import read_data, write_drug_model_result
+from plot_utils import plot_roc_aupr_curves
 
 #mlflow.create_experiment(
  #   name="Drug_Sensitivity_Model_Training_test",
@@ -276,10 +277,10 @@ def skl_drug_model(X, Y, drug, config, n_cores=1):
 
     # final results in a dictionary
     final_results = {
-        'best_model': model0,
+        'best_model': model0, # This will be the best estimator from search or the original imba_pipeline
         'drug': drug,
         'model_class': model_name,
-        'model_search': cv_estimator, # This will be the best estimator from search or the original imba_pipeline
+        'model_search': search_estimator, 
         'search_method': search_method,
         'X_test': X_test,
         'Y_test': y_test,
@@ -331,6 +332,16 @@ if __name__ == '__main__':
     results = skl_drug_model(X, y, drug=drug_name, config=config, n_cores=n_cores)
 
     logging.info(f'Finished training in {time.time()-start_t}s')
+
+    # Plot ROC and AUPR curves
+    plot_roc_aupr_curves(
+        best_model=results['best_model'],
+        X_test=results['X_test'],
+        y_test=results['Y_test'],
+        drug=results['drug'],
+        output_dir=f'{out_dir}/{run_name}' # Use the same output directory as other results
+    )
+
     # Write results
     out_dir=f'{out_dir}/{run_name}'
     write_drug_model_result(results, out_dir=out_dir)
