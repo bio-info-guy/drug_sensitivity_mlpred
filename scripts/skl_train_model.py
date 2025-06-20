@@ -138,6 +138,7 @@ def perform_hyperparameter_search(  imba_pipeline, X, y, config, n_cores, kfold_
             scoring=scoring_metric,
             n_jobs=n_cores // 2
         )
+        search_estimator_best = search_estimator
     elif search_method == 'halvingrandomsearch':
         search_estimator = HalvingRandomSearchCV(
             imba_pipeline,
@@ -147,6 +148,7 @@ def perform_hyperparameter_search(  imba_pipeline, X, y, config, n_cores, kfold_
             n_jobs=cv_splits,
             verbose=2
         )
+        search_estimator_best = search_estimator
     elif search_method == 'optuna':
         if not OPTUNA_AVAILABLE:
             raise ImportError("Optuna is not available. Please install optuna to use optuna search.")
@@ -162,19 +164,29 @@ def perform_hyperparameter_search(  imba_pipeline, X, y, config, n_cores, kfold_
             verbose=2,
             callbacks=[dummy_gc]
         )
+        search_estimator_best = OptunaSearchCV(
+            imba_pipeline,
+            param_distributions=final_search_parameters,
+            cv=kfold_inner,
+            scoring=scoring_metric,
+            n_jobs=n_cores // 2,
+            n_trials=60,
+            verbose=2,
+            callbacks=[dummy_gc]
+        )
     else:
         raise ValueError(f"Unknown search method: {search_method}")
 
     # Fit the search estimator to get best parameters
-    search_estimator.fit(X, y)
+    search_estimator_best.fit(X, y)
 
     # Extract best parameters
     if oversample_flag:
-        best_params = {key.removeprefix('classifier__'): search_estimator.best_params_[key]
-                       for key in search_estimator.best_params_}
-    else:
-        best_params = search_estimator.best_params_
-    cv_estimator = search_estimator.best_estimator_
+        best_params = {key.removeprefix('classifier__'): search_estimator_best.best_params_[key]
+                       for key in search_estimator_best.best_params_}
+    else:ls
+        best_params = search_estimator_best.best_params_
+    cv_estimator = search_estimator_best.best_estimator_
 
     return cv_estimator, search_estimator, best_params
 
