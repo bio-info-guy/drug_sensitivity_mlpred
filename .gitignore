@@ -4,7 +4,7 @@
 *.out
 .vscode/
 *_output/
-*log
+*log*
 new_data/
 /mlruns/
 /test_out/

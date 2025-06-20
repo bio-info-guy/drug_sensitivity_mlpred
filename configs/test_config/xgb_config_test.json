@@ -8,6 +8,8 @@
     "cv_splits": 5,
     "scoring_metric": "average_precision",
     "search_method": "optuna",
+    "nested_cv":true,
+    "hpo_n_trials": 5,
     "fixed_params": {
     },
     "grid_search_params": {

@@ -21,8 +21,7 @@ except ImportError:
 
 def outer_cross_validate(estimator, X, y=None, cv=None, scoring=None, random_state=None):
     """
-    Perform cross-validation similar to sklearn's cross_validate but with support
-    for parameter searchers like GridSearchCV.
+    Perform cross-validation similar to sklearn's cross_validate but also record best parameters if estimator is an HPO 
     
     Parameters:
     -----------

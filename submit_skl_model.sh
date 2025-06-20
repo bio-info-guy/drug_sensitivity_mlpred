@@ -1,8 +1,7 @@
 #!/bin/bash
-#SBATCH --partition=all
+#SBATCH --partition=Orion
 #SBATCH --mem=64G
 #SBATCH --time=3:00:00
-#SBATCH --account=ihc
 #SBATCH --cpus-per-task=24
 
 
