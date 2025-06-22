@@ -28,6 +28,7 @@ from imblearn.over_sampling import RandomOverSampler, SMOTE
 from imblearn.pipeline import Pipeline, make_pipeline
 from sklearn.linear_model import SGDClassifier
 from lightgbm import LGBMClassifier
+from sklearn.preprocessing import StandardScaler
 import argparse
 import mlflow
 import mlflow.sklearn
@@ -62,9 +63,13 @@ OVERSAMPLER_TYPES = {
     'SMOTE': SMOTE
 }
 
-def handle_oversampling(config, base_estimator, X_train, y_train):
+
+
+
+
+def build_pipe(config, base_estimator):
     """
-    Handles oversampling based on configuration.
+    Builds base pipeline based on config. Only implemented standardscaler
 
     Args:
         config: Configuration dictionary with oversampling parameters.
@@ -79,23 +84,26 @@ def handle_oversampling(config, base_estimator, X_train, y_train):
             - y_res: Resampled y_train or original y_train.
     """
     oversample_flag = config['use_oversampling']
-    oversampler_class = OVERSAMPLER_TYPES[config['oversampler_type']]
-    oversampler = oversampler_class(random_state=config['oversampler_seed'])
-
-    if oversample_flag:
-        X_res, y_res = oversampler.fit_resample(X_train, y_train)
-        pipeline_estimator = Pipeline([
-            ('sampling', oversampler),
-            ('classifier', base_estimator)
-        ])
-    else:
-        X_res, y_res = X_train, y_train
-        pipeline_estimator = base_estimator
+    scaler_flag = config['scale_data']
+    scaler_class = StandardScaler()
     
-    return pipeline_estimator, X_res, y_res
+    pipe_list = []
+    if oversample_flag:
+        oversampler_class = OVERSAMPLER_TYPES[config['oversampler_type']]
+        oversampler = oversampler_class(random_state=config['oversampler_seed'])
+        pipe_list.append(('sampling', oversampler))
+    if scaler_flag:
+        pipe_list.append(('scaling', scaler_class))
+    
+    pipe_list.append(('classifier', base_estimator))
+
+    pipeline_estimator = Pipeline(
+            pipe_list
+        )
+    return pipeline_estimator
 
 
-def perform_hyperparameter_search(  imba_pipeline, X, y, config, n_cores, kfold_inner, oversample_flag):
+def perform_hyperparameter_search(  imba_pipeline, X, y, config, n_cores, kfold_inner):
     """
     Performs hyperparameter search using GridSearchCV, HalvingRandomSearchCV, or OptunaSearchCV.
 
@@ -121,12 +129,7 @@ def perform_hyperparameter_search(  imba_pipeline, X, y, config, n_cores, kfold_
 
     if not search_params:
         return imba_pipeline, None, None
-
-    final_search_parameters = {}
-    if oversample_flag:
-        final_search_parameters = {'classifier__' + key: search_params[key] for key in search_params}
-    else:
-        final_search_parameters = search_params
+    final_search_parameters = {'classifier__' + key: search_params[key] for key in search_params}
 
     search_estimator = None
     if search_method == 'gridcv':
@@ -160,7 +163,7 @@ def perform_hyperparameter_search(  imba_pipeline, X, y, config, n_cores, kfold_
             cv=kfold_inner,
             scoring=scoring_metric,
             n_jobs=n_cores // 2,
-            n_trials=hpo_n_trials,
+            n_trials=5,
             verbose=2,
             callbacks=[dummy_gc]
         )
@@ -170,7 +173,7 @@ def perform_hyperparameter_search(  imba_pipeline, X, y, config, n_cores, kfold_
             cv=kfold_inner,
             scoring=scoring_metric,
             n_jobs=n_cores // 2,
-            n_trials=60,
+            n_trials=hpo_n_trials,
             verbose=2,
             callbacks=[dummy_gc]
         )
@@ -181,14 +184,70 @@ def perform_hyperparameter_search(  imba_pipeline, X, y, config, n_cores, kfold_
     search_estimator_best.fit(X, y)
 
     # Extract best parameters
-    if oversample_flag:
-        best_params = {key.removeprefix('classifier__'): search_estimator_best.best_params_[key]
-                       for key in search_estimator_best.best_params_}
-    else:ls
-        best_params = search_estimator_best.best_params_
+    best_params = search_estimator_best.best_params_
     cv_estimator = search_estimator_best.best_estimator_
 
     return cv_estimator, search_estimator, best_params
+
+
+def calculate_feature_importance(pipeline_model, X_train):
+    """
+    Calculates feature importance based on model type and training data.
+
+    Args:
+        pipeline_model: A Pipeline object with a 'classifier' key pointing to the model.
+        X_train: Training features (pandas DataFrame).
+
+    Returns:
+        A pandas DataFrame with feature importances.
+    """
+    classifier = pipeline_model.named_steps['classifier']
+    feature_names = X_train.columns
+
+    # Tree-based models
+    if hasattr(classifier, 'feature_importances_'):
+        importances = classifier.feature_importances_
+        feature_importance_df = pd.DataFrame({
+            'Feature': feature_names,
+            'Importance': importances
+        })
+        feature_importance_df = feature_importance_df.sort_values(by='Importance', ascending=False).reset_index(drop=True)
+        return feature_importance_df
+    
+    # Linear models
+    elif hasattr(classifier, 'coef_'):
+        coef = classifier.coef_[0] if classifier.coef_.ndim > 1 else classifier.coef_
+
+        # Check if StandardScaler was used in the pipeline
+        scaler_used = False
+        if 'scaling' in pipeline_model.named_steps:
+            scaler = pipeline_model.named_steps['scaling']
+            if isinstance(scaler, StandardScaler):
+                scaler_used = True
+
+        if not scaler_used:
+            # Calculate standard deviation of each feature from X_train
+            std_dev = X_train.std().values
+            # Multiply coef_ by standard deviation
+            feature_importances = np.abs(coef * std_dev)
+        else:
+            # If scaler was used, coef_ already reflects scaled importance
+            feature_importances = np.abs(coef)
+            std_dev = np.full(len(feature_names), np.nan) # No direct std_dev to multiply if scaled
+
+        feature_importance_df = pd.DataFrame({
+            'Feature': feature_names,
+            'Original_Coef': coef,
+            'Standard_Deviation': std_dev,
+            'Final_Importance': feature_importances
+        })
+        feature_importance_df = feature_importance_df.sort_values(by='Final_Importance', ascending=False).reset_index(drop=True)
+        return feature_importance_df
+    
+    else:
+        logging.warning(f"Model type {type(classifier).__name__} does not have feature_importances_ or coef_ attribute.")
+        return pd.DataFrame()
+
 
 # Basic function to handle sklearn and traditional model training and basic hyperparameter optimization
 # TODO refactor this into a class maybe, class DrugModel
@@ -237,14 +296,17 @@ def skl_drug_model(X, Y, drug, config, n_cores=1):
     model0 = model_class( **fixed_params)
 
     # Handle oversampling and get the initial pipeline and resampled data
-    imba_pipeline, X_res, y_res = handle_oversampling(config, model0, X_train, y_train)
+    imba_pipeline = build_pipe(config, model0)
+
     oversample_flag = config['use_oversampling']
     
     # Perform hyperparameter search if needed
     search_estimator = None
     logging.info("This is the current search method: "+search_method)
+
+    # HPO
     cv_estimator, search_estimator, best_params = perform_hyperparameter_search(
-        imba_pipeline, X, y, config, n_cores, kfold_inner, oversample_flag
+        imba_pipeline, X_train, y_train, config, n_cores, kfold_inner
     )
 
     # Only perform nested cross validation if doing hyperparameter search to evaluate model
@@ -267,26 +329,16 @@ def skl_drug_model(X, Y, drug, config, n_cores=1):
         )
 
 
-    #cv_results = cross_validate(
-     #   imba_pipeline, X_train, y_train, cv=kfold, 
-      #  scoring=['accuracy', 'precision', 'recall', 'f1', 'roc_auc'], 
-       # n_jobs=n_cores
-     #)
     cv_results = pd.DataFrame(cv_results)
 
-    # Fit the classifier to the training data
-    # model0 is the base model, which needs to be fitted on X_res, y_res
-    # If best_estimator_from_search is a pipeline, it's already fitted during the search.
-    # If no search, model0 is the base model.
-    # If search was performed, best_estimator_from_search is the fitted pipeline
     model0 = cv_estimator # Use the best estimator from search as the final model
-     # If no search, fit the initial model0 on resampled data
+     # fit this hpo model on training data 
     model0.fit(X_train, y_train)
     y_pred = model0.predict(X_test)
     conf_mat = confusion_matrix(y_test, y_pred)
     model_report = classification_report(y_test, y_pred, output_dict=True, labels=np.unique(y_pred))
     model_report = pd.DataFrame(model_report).transpose()
-
+    feature_importance = calculate_feature_importance(model0, X_train)
     # final results in a dictionary
     final_results = {
         'best_model': model0, # This will be the best estimator from search or the original imba_pipeline
@@ -301,7 +353,8 @@ def skl_drug_model(X, Y, drug, config, n_cores=1):
         'cv_results': cv_results,
         'oversample': oversample_flag,
         'confusion_matrix':conf_mat,
-        'report':model_report
+        'report':model_report,
+        'feature_importance':feature_importance
     }
 
     return final_results
@@ -345,16 +398,19 @@ if __name__ == '__main__':
 
     logging.info(f'Finished training in {time.time()-start_t}s')
 
+    
+
+    # Write results
+    out_dir=f'{out_dir}/{run_name}'
+    write_drug_model_result(results, out_dir=out_dir)
+    shutil.copy2(config_file, out_dir)
+
     # Plot ROC and AUPR curves
     plot_roc_aupr_curves(
         best_model=results['best_model'],
         X_test=results['X_test'],
         y_test=results['Y_test'],
         drug=results['drug'],
-        output_dir=f'{out_dir}/{run_name}' # Use the same output directory as other results
+        output_dir=out_dir,
+        threshold_type='both'# Use the same output directory as other results
     )
-
-    # Write results
-    out_dir=f'{out_dir}/{run_name}'
-    write_drug_model_result(results, out_dir=out_dir)
-    shutil.copy2(config_file, out_dir)

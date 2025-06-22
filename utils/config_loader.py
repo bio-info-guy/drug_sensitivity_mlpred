@@ -43,29 +43,17 @@ def _parse_optuna_distribution(dist_str):
     """Parses a string representation of an optuna distribution."""
     if not OPTUNA_AVAILABLE:
         raise ImportError("Optuna is not available. Please install optuna to use optuna distributions.")
-    
+    dist_str0 = dist_str
     # Remove 'optuna.distributions.' prefix if present
     if dist_str.startswith('optuna.distributions.'):
         dist_str = dist_str[len('optuna.distributions.'):]
-    
-    # Parse the distribution
+        # Parse the distribution
     if dist_str.startswith('FloatDistribution('):
-        args_str = dist_str[len('FloatDistribution('):-1]
-        args = [float(arg.strip()) for arg in args_str.split(',')]
-        return optuna.distributions.FloatDistribution(*args)
+        return eval(dist_str0)
     elif dist_str.startswith('IntDistribution('):
-        args_str = dist_str[len('IntDistribution('):-1]
-        args = [int(arg.strip()) for arg in args_str.split(',')]
-        return optuna.distributions.IntDistribution(*args)
+        return eval(dist_str0)
     elif dist_str.startswith('CategoricalDistribution('):
-        args_str = dist_str[len('CategoricalDistribution('):-1]
-        # Handle list of categories
-        if args_str.startswith('[') and args_str.endswith(']'):
-            args_str = args_str[1:-1]
-            categories = [arg.strip().strip('"\'') for arg in args_str.split(',')]
-        else:
-            categories = [args_str.strip().strip('"\'')]
-        return optuna.distributions.CategoricalDistribution(categories)
+        return eval(dist_str0)
     else:
         raise ValueError(f"Unsupported optuna distribution: {dist_str}")
 

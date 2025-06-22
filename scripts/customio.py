@@ -55,12 +55,5 @@ def write_drug_model_result(model_results, out_dir):
     else:
         print(drug, "Nothing predicted as 1",
               file=open(f'{out_dir}/{model_name}_classification_report_log.txt', "a"))
-
-	 
-
-	 # feature importance extraction
-    if model_name in ['XGBClassifier','RandomForestClassifier']:
-        fi = pd.DataFrame({'feature': list(X_train.columns),
-					'importances': model0.feature_importances_ * 100}).\
-					 sort_values('importances', ascending = False)
-        fi.to_csv(f'{full_out_dir}/{model_name}_feature_importance_{drug}.csv')
+    fi = model_results['feature_importance']
+    fi.to_csv(f'{full_out_dir}/{model_name}_feature_importance_{drug}.csv')

@@ -1,15 +1,16 @@
 {
     "model_type": "XGBClassifier",
-    "use_oversampling": false,
+    "use_oversampling": true,
     "oversampler_type": "SMOTE",
     "oversampler_seed": 42,
     "train_test_split_seed": 20,
     "cv_seed": 7,
     "cv_splits": 5,
-    "scoring_metric": "average_precision",
+    "scoring_metric": "f1",
     "search_method": "optuna",
     "nested_cv":true,
     "hpo_n_trials": 5,
+    "scale_data": false,
     "fixed_params": {
     },
     "grid_search_params": {
