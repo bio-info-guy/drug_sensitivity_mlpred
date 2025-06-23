@@ -5,7 +5,6 @@ import logging
 import sys
 from xgboost import XGBClassifier
 from sklearn.ensemble import RandomForestClassifier as skl_rf
-from cuml import RandomForestClassifier as cu_rf
 from sklearn.linear_model import SGDClassifier
 from lightgbm import LGBMClassifier
 from imblearn.over_sampling import RandomOverSampler, SMOTE
@@ -28,12 +27,13 @@ OVERSAMPLER_TYPES = {
     'SMOTE': SMOTE
 }
 
-def get_model_for_device(config, n_cores=1):
+def get_model_for_device(config):
+
     model_name = config['model_type']
     device = config.get('device', 'cpu') # Default to CPU if not specified
     fixed_params = config.get('fixed_params', {})
     search_method = config.get('search_method', None) # Get search method from config
-
+    n_cores = config.get('n_cores', 1)
     # Ensure device is 'cpu' for models that don't support GPU
     if model_name not in ['XGBClassifier', 'RandomForestClassifier']:
         device = 'cpu' # Force to CPU if GPU is requested for unsupported models
@@ -59,6 +59,7 @@ def get_model_for_device(config, n_cores=1):
     elif model_name == 'RandomForestClassifier':
         if device == 'cuda':
             # For GPU RandomForest, use cuml's RandomForestClassifier
+            from cuml import RandomForestClassifier as cu_rf
             return cu_rf(**fixed_params)
         else:
             # For CPU RandomForest, use scikit-learn's RandomForestClassifier

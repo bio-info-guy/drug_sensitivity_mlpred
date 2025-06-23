@@ -8,7 +8,7 @@ except ImportError:
 import logging
 from utils.misc import dummy_gc
 
-def perform_hyperparameter_search( imba_pipeline, X, y, config, n_cores, kfold_inner):
+def perform_hyperparameter_search( imba_pipeline, X, y, config, kfold_inner):
     """
     Performs hyperparameter search using GridSearchCV, HalvingRandomSearchCV, or OptunaSearchCV.
 
@@ -31,7 +31,7 @@ def perform_hyperparameter_search( imba_pipeline, X, y, config, n_cores, kfold_i
     search_method = config.get('search_method', 'gridcv')
     scoring_metric = config.get('scoring_metric', 'average_precision')
     cv_splits = config.get('cv_splits', 5)
-
+    n_cores = max(2, config.get('n_cores', 2))
     if not search_params:
         return imba_pipeline, None, None
     final_search_parameters = {'classifier__' + key: search_params[key] for key in search_params}

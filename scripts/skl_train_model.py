@@ -35,7 +35,7 @@ import mlflow.sklearn
  
 # Basic function to handle sklearn and traditional model training and basic hyperparameter optimization
 # TODO refactor this into a class maybe, class DrugModel
-def skl_drug_model(X, Y, drug, config, n_cores=1):
+def skl_drug_model(X, Y, drug, config):
     """
     Train a drug sensitivity model using configuration parameters.
     
@@ -44,7 +44,6 @@ def skl_drug_model(X, Y, drug, config, n_cores=1):
         Y: Target matrix (all drugs)
         drug: Specific drug name to model
         config: Configuration dictionary with model parameters
-        n_cores: Number of cores to use for parallel processing
     """
     # select drug column
     y = Y[drug]
@@ -68,7 +67,7 @@ def skl_drug_model(X, Y, drug, config, n_cores=1):
     logging.info("This is the current config:\n"+yaml.dump(config))
     
     # Initialize base model using the new function
-    model0 = get_model_for_device(config, n_cores)
+    model0 = get_model_for_device(config)
 
     # Handle oversampling and get the initial pipeline and resampled data
     imba_pipeline = build_pipe(config, model0)
@@ -79,7 +78,7 @@ def skl_drug_model(X, Y, drug, config, n_cores=1):
 
     # HPO
     cv_estimator, search_estimator, best_params = perform_hyperparameter_search(
-        imba_pipeline, X_train, y_train, config, n_cores, kfold_inner
+        imba_pipeline, X_train, y_train, config, kfold_inner
     )
 
     # Only perform nested cross validation if doing hyperparameter search to evaluate model
@@ -151,10 +150,8 @@ if __name__ == '__main__':
     #Load data
     X, y, drugs = read_data(data_file)
     #load config
-    config = load_config(config_file)
+    config = load_config(config_file, n_cores, device)
     # Only set device in config if model type is XGBoost or RandomForest
-    if config.get('model_type') in ['XGBClassifier', 'RandomForestClassifier']:
-        config['device'] = device
     # generate a run name
     run_name = random_name(config, X, y)
     os.makedirs(f'./logs/{run_name}', exist_ok=True)
@@ -172,7 +169,7 @@ if __name__ == '__main__':
     # Train model
     start_t = time.time()
     logging.info('started training')
-    results = skl_drug_model(X, y, drug=drug_name, config=config, n_cores=n_cores)
+    results = skl_drug_model(X, y, drug=drug_name, config=config)
 
     logging.info(f'Finished training in {time.time()-start_t}s')
 

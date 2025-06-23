@@ -57,7 +57,7 @@ def _parse_optuna_distribution(dist_str):
     else:
         raise ValueError(f"Unsupported optuna distribution: {dist_str}")
 
-def load_config(config_file):
+def load_config(config_file, n_cores, device):
     """Load configuration from JSON or YAML file."""
     with open(config_file, 'r') as f:
         if config_file.endswith('.json'):
@@ -116,6 +116,15 @@ def load_config(config_file):
     # Add the active search parameters to the config for easy access
     config['search_params'] = config[search_params_key]
     
+    #handle gpu and cpu here
+    if config.get('model_type') in ['XGBClassifier', 'RandomForestClassifier']:
+        config['device'] = device
+        if device == 'cuda':
+            config['n_cores'] = 1
+        else:
+            config['n_cores'] = n_cores
+
+
     return config
 
 def load_flaml_config(config_file):
