@@ -17,8 +17,7 @@ MODEL_TYPES = {
     'XGBClassifier': XGBClassifier,
     'RandomForestClassifier': skl_rf,
     'SGDClassifier': SGDClassifier,
-    'LGBMClassifier': LGBMClassifier,
-    'cu_RandomForestClassifier': cu_rf # Added for GPU RandomForest
+    'LGBMClassifier': LGBMClassifier# Added for GPU RandomForest
 }
 
 # Define oversampler types

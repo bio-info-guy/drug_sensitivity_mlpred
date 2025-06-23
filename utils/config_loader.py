@@ -115,14 +115,12 @@ def load_config(config_file, n_cores, device):
     
     # Add the active search parameters to the config for easy access
     config['search_params'] = config[search_params_key]
-    
+    config['device'] = device
+    config['n_cores'] = n_cores
     #handle gpu and cpu here
     if config.get('model_type') in ['XGBClassifier', 'RandomForestClassifier']:
-        config['device'] = device
         if device == 'cuda':
             config['n_cores'] = 1
-        else:
-            config['n_cores'] = n_cores
 
 
     return config
