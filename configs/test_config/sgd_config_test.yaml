@@ -12,7 +12,7 @@ hpo_n_trials: 5
 scale_data: false
 fixed_params:
   random_state: 42
-  loss: "hinge"
+  loss: "log_loss"
   penalty: "elasticnet"
 grid_search_params:
   l1_ratio: "uniform(0.0, 1.0)" # This looks like a distribution, for grid search it should be a list e.g. [0.1, 0.5, 0.9]

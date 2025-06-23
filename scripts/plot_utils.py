@@ -4,7 +4,7 @@ from sklearn.metrics import roc_curve, auc, precision_recall_curve, average_prec
 import numpy as np
 import os
 from sklearn_evaluation.plot import confusion_matrix, ConfusionMatrix
-
+from decimal import Decimal
 
 def plot_roc_aupr_curves(best_model, X_test, y_test, drug, output_dir=".", threshold_type='best_precision'):
     """
@@ -39,7 +39,6 @@ def plot_roc_aupr_curves(best_model, X_test, y_test, drug, output_dir=".", thres
     # AUPR Curve
     precision, recall, thresholds = precision_recall_curve(y_test, y_pred_proba)
     aupr_score = average_precision_score(y_test, y_pred_proba)
-
 
 
     # Calculate predictions based on default and best precision threshold
@@ -90,7 +89,6 @@ def plot_roc_aupr_curves(best_model, X_test, y_test, drug, output_dir=".", thres
     best_threshold_precision = thresholds[best_precision_idx]
     best_recall_precision = recall[best_precision_idx]
     best_precision_precision = precision[best_precision_idx]
-
     y_pred_f1 = (y_pred_proba >= best_threshold_f1).astype(int)
     y_pred_threshold = (y_pred_proba >= best_threshold_precision).astype(int)
     # Select which threshold to highlight based on threshold_type
@@ -107,7 +105,8 @@ def plot_roc_aupr_curves(best_model, X_test, y_test, drug, output_dir=".", thres
         highlight_threshold = best_threshold_precision
         highlight_recall = best_recall_precision
         highlight_precision = best_precision_precision
-        label_text = f'Max Precision={np.max(precision):.2f} (Thresh={highlight_threshold:.2f})'
+        highlight_threshold = '%.2E' % Decimal(highlight_threshold) if highlight_threshold > 0.999 else str(round(highlight_threshold, 3))
+        label_text = f'Max Precision={np.max(precision[:-1]):.2f} (Thresh={highlight_threshold})'
         plt.plot(highlight_recall, highlight_precision, 'o', markersize=8, color='green',
              label=label_text)
         plt.axvline(x=highlight_recall, color='gray', linestyle='--', lw=1)

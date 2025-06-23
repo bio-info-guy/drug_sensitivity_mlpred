@@ -31,7 +31,7 @@ def read_data(fpath: str):
 
 def write_drug_model_result(model_results, out_dir):
     model0 = model_results['best_model']
-    oversample = model_results['oversample']
+    oversample = 'oversample' if model_results['oversample'] else ''
     drug = model_results['drug']
     model_name = model_results['model_class']
     full_out_dir = f'{out_dir}/{drug}/'
@@ -41,7 +41,6 @@ def write_drug_model_result(model_results, out_dir):
 
 
     os.makedirs(full_out_dir, exist_ok=True)
-    print(full_out_dir)
     joblib.dump(model0, f'{full_out_dir}/{model_name}_{drug}.joblib')
     model_results['cv_results'].to_csv(f'{full_out_dir}/{model_name}_cv_results_{drug}.csv')
     print(drug,
