@@ -9,8 +9,9 @@ from sklearn.linear_model import SGDClassifier
 from lightgbm import LGBMClassifier
 from imblearn.over_sampling import RandomOverSampler, SMOTE
 from imblearn.pipeline import Pipeline, make_pipeline
-sys.path.append('../drug_sensitivity_mlpred/')
-from utils.misc import set_cuda_device
+sys.path.append('../')
+sys.path.append('./')
+from parallel.device_pin import set_cuda_device, pick_free_gpu
 import logging
 
 MODEL_TYPES = {
