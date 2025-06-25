@@ -153,7 +153,7 @@ if __name__ == '__main__':
     config = load_config(config_file, n_cores, device)
     # Only set device in config if model type is XGBoost or RandomForest
     # generate a run name
-    run_name = random_name(config, X, y)
+    run_name = config['model_type']+'_'+random_name(config_file, X, y)
     os.makedirs(f'./logs/{run_name}', exist_ok=True)
 
     logging.basicConfig(

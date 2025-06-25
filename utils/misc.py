@@ -19,7 +19,8 @@ def hash_string_to_8_digits(input_string):
     hex_digest = hash_object.hexdigest()
     return int(hex_digest, 16) % (10**8)
 
-def random_name(config, X, y):
+def random_name(config_file, X, y):
+    config = open(config_file).read()
     config_hash = hash_string_to_8_digits(str(config))
     X_hash = hash_string_to_8_digits(str(X.sum().sum()))
     y_hash = hash_string_to_8_digits(str(y.sum().sum()))
