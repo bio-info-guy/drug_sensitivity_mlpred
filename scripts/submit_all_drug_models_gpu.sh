@@ -61,8 +61,8 @@ mkdir -p "${SLURM_LOGS_DIR}"
 mkdir -p "${OUT_DIR}"
 
 # Calculate CPU and memory allocation
-CPUS_PER_TASK=$((N_CORES + 4))
-MEMORY="64G"
+CPUS_PER_TASK=$((N_CORES + 2))
+MEMORY="24G"
 
 echo "Using parameters:"
 echo "  Data File: ${DATA_FILE}"
@@ -96,12 +96,13 @@ cat > "${SLURM_JOB_SCRIPT}" <<EOF
 #SBATCH --job-name=skl_drug_model_array
 #SBATCH --output=${SLURM_LOGS_DIR}/skl_drug_model_array_%A_%a.out
 #SBATCH --error=${SLURM_LOGS_DIR}/skl_drug_model_array_%A_%a.err
-#SBATCH --time=07:00:00
+#SBATCH --time=05:00:00
 #SBATCH --mem=${MEMORY}
 #SBATCH --nodes=1
-#SBATCH --partition=Orion,Draco,Nebula
+#SBATCH --partition=GPU,Nebula_GPU
 #SBATCH --cpus-per-task=${CPUS_PER_TASK}
-#SBATCH --array=250-500%50
+#SBATCH --array=80-250%35
+#SBATCH --gres=gpu:1
 
 # Initialize Mamba (if not already initialized)
 eval "\$(mamba shell hook --shell bash)"
@@ -136,8 +137,8 @@ python scripts/skl_train_model.py \\
     --drug_name "\${CURRENT_DRUG}" \\
     --config_file "\${CONFIG_FILE}" \\
     --out_dir "\${OUT_DIR}" \\
-    --n_cores "\${N_CORES}"
-
+    --n_cores "\${N_CORES}" \\
+    --device cuda
 
 
 echo "Finished job for drug: \${CURRENT_DRUG}"
