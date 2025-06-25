@@ -1,6 +1,6 @@
 {
     "model_type": "RandomForestClassifier",
-    "use_oversampling": true,
+    "use_oversampling": false,
     "oversampler_type": "SMOTE",
     "oversampler_seed": 42,
     "train_test_split_seed": 20,
@@ -12,7 +12,8 @@
     "hpo_n_trials": 100,
     "scale_data": false,
     "fixed_params": {
-        "random_state": 42
+        "random_state": 42,
+        "class_weight": "balanced"
     },
     "grid_search_params": {
         "n_estimators": [100, 150, 250],
@@ -30,6 +31,7 @@
         "n_estimators": "optuna.distributions.IntDistribution(50, 500)",
         "max_depth": "optuna.distributions.IntDistribution(5, 200)",
         "min_samples_split": "optuna.distributions.IntDistribution(2, 20)",
-        "min_samples_leaf": "optuna.distributions.IntDistribution(1, 10)"
+        "min_samples_leaf": "optuna.distributions.IntDistribution(1, 10)",
+        "max_features": "optuna.distributions.IntDistribution(30, 300)"
     }
 }
