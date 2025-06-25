@@ -7,8 +7,11 @@
     "cv_seed": 7,
     "cv_splits": 5,
     "scoring_metric": "f1",
+    "scoring_metric": "f1",
     "search_method": "optuna",
     "nested_cv": true,
+    "hpo_n_trials": 30,
+    "scale_data": false,
     "hpo_n_trials": 30,
     "scale_data": false,
     "fixed_params": {
