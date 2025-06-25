@@ -48,7 +48,7 @@ def get_model_for_device(config):
             fixed_params['n_jobs'] = n_cores
     else: # GPU models (device == 'cuda')
         fixed_params['n_jobs'] = 1 # n_jobs is effectively 1 for GPU models
-
+    logging.info(f"using {fixed_params['n_jobs']} for model training")
     if model_name == 'XGBClassifier':
         if device == 'cuda':
             # For GPU XGBoost, set device and tree_method

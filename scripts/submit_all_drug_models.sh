@@ -62,7 +62,7 @@ mkdir -p "${OUT_DIR}"
 
 # Calculate CPU and memory allocation
 CPUS_PER_TASK=$((N_CORES + 4))
-MEMORY="48G"
+MEMORY="64G"
 
 echo "Using parameters:"
 echo "  Data File: ${DATA_FILE}"
@@ -96,7 +96,7 @@ cat > "${SLURM_JOB_SCRIPT}" <<EOF
 #SBATCH --job-name=skl_drug_model_array
 #SBATCH --output=${SLURM_LOGS_DIR}/skl_drug_model_array_%A_%a.out
 #SBATCH --error=${SLURM_LOGS_DIR}/skl_drug_model_array_%A_%a.err
-#SBATCH --time=05:00:00
+#SBATCH --time=06:00:00
 #SBATCH --mem=${MEMORY}
 #SBATCH --nodes=1
 #SBATCH --account=ihc

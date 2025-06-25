@@ -61,6 +61,7 @@ def perform_hyperparameter_search( imba_pipeline, X, y, config, kfold_inner):
         if not OPTUNA_AVAILABLE:
             raise ImportError("Optuna is not available. Please install optuna to use optuna search.")
         logging.info("This is the current search_parameters: " + str(final_search_parameters))
+        logging.info(f"using {n_cores} for cross validation")
         hpo_n_trials = config.get('hpo_n_trials', 5)
         search_estimator = OptunaSearchCV(
             imba_pipeline,
