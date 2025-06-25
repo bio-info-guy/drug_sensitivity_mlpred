@@ -39,7 +39,7 @@ def get_model_for_device(config):
         device = 'cpu' # Force to CPU if GPU is requested for unsupported models
     if device == 'cuda':
         logging.info('running on gpu')
-        set_cuda_device()
+        #set_cuda_device()
     # Determine n_jobs based on device and search_method
     if device == 'cpu':# CPU models
         if search_method in ['gridcv', 'optuna', 'halvingrandomsearch']: # If hyperparameter search is active
@@ -52,17 +52,22 @@ def get_model_for_device(config):
     if model_name == 'XGBClassifier':
         if device == 'cuda':
             # For GPU XGBoost, set device and tree_method
+            logging.info('XGBoost using cuda')
             return XGBClassifier(device='cuda', tree_method='hist', **fixed_params)
         else:
             # For CPU XGBoost, use default or specified n_jobs
+            logging.info('XGBoost using cpu')
             return XGBClassifier(**fixed_params)
     elif model_name == 'RandomForestClassifier':
         if device == 'cuda':
             # For GPU RandomForest, use cuml's RandomForestClassifier
+            
             from cuml import RandomForestClassifier as cu_rf
+            logging.info('RandomForest using cuda')
             return cu_rf(**fixed_params)
         else:
             # For CPU RandomForest, use scikit-learn's RandomForestClassifier
+            logging.info('RandomForest using cpu')
             return skl_rf(**fixed_params)
     elif model_name in MODEL_TYPES:
         # For other models, use the CPU version from MODEL_TYPES
