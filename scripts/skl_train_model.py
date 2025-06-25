@@ -24,8 +24,8 @@ from ml_models import build_pipe, get_model_for_device
 from hpo import perform_hyperparameter_search
 import logging
 
-import mlflow
-import mlflow.sklearn
+#import mlflow
+#import mlflow.sklearn
 
 #mlflow.create_experiment(
  #   name="Drug_Sensitivity_Model_Training_test",

@@ -30,6 +30,6 @@
  	    "max_depth" : "optuna.distributions.IntDistribution(3, 20)",
  	    "min_child_weight" : "optuna.distributions.IntDistribution(1, 7)",
 	    "subsample": "optuna.distributions.FloatDistribution(0.5, 1.0)",
-        "n_estimator": "optuna.distributions.IntDistribution(50, 300)"
+        "n_estimators": "optuna.distributions.IntDistribution(50, 300)"
     }
 }
