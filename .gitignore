@@ -13,3 +13,5 @@ new_data/
 *png
 *plots*
 *results*
+/bash_submit_slurm/
+/old_scripts/
