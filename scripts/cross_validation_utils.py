@@ -19,7 +19,7 @@ except ImportError:
     OptunaSearchCV = None
 
 
-def outer_cross_validate(estimator, X, y=None, cv=None, scoring=None, random_state=None):
+def outer_cross_validate(estimator, X, y=None, cv=None, scoring=None, random_state=None, **fit_params):
     """
     Perform cross-validation similar to sklearn's cross_validate but also record best parameters if estimator is an HPO 
     
@@ -103,8 +103,10 @@ def outer_cross_validate(estimator, X, y=None, cv=None, scoring=None, random_sta
         else:
             y_train, y_test = None, None
         # Fit the estimator and measure training time
+        fit_params['classifier__eval_set'] = [(X_test, y_test)]
         start_fit_time = time.time()
-        estimator_fold.fit(X_train, y_train)
+
+        estimator_fold.fit(X_train, y_train, **fit_params)
         fit_time = time.time() - start_fit_time
         results['fit_time'].append(fit_time)
         

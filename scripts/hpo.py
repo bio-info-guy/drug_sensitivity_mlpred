@@ -31,7 +31,7 @@ def perform_hyperparameter_search( imba_pipeline, X, y, config, kfold_inner):
     search_method = config.get('search_method', 'gridcv')
     scoring_metric = config.get('scoring_metric', 'average_precision')
     cv_splits = config.get('cv_splits', 5)
-    n_cores = max(2, config.get('n_cores', 2))
+    n_cores = max(1, config.get('n_cores', 1))
     if not search_params:
         return imba_pipeline, None, None
     final_search_parameters = {'classifier__' + key: search_params[key] for key in search_params}
@@ -44,7 +44,7 @@ def perform_hyperparameter_search( imba_pipeline, X, y, config, kfold_inner):
             cv=kfold_inner,
             pre_dispatch=cv_splits,
             scoring=scoring_metric,
-            n_jobs=n_cores // 2
+            n_jobs=n_cores 
         )
         search_estimator_best = search_estimator
     elif search_method == 'halvingrandomsearch':
@@ -68,7 +68,7 @@ def perform_hyperparameter_search( imba_pipeline, X, y, config, kfold_inner):
             param_distributions=final_search_parameters,
             cv=kfold_inner,
             scoring=scoring_metric,
-            n_jobs=n_cores // 2,
+            n_jobs=n_cores,
             n_trials=30, # at least 30 trials for optuna search, hardcoded for now
             verbose=2,
             callbacks=[dummy_gc]
@@ -78,7 +78,7 @@ def perform_hyperparameter_search( imba_pipeline, X, y, config, kfold_inner):
             param_distributions=final_search_parameters,
             cv=kfold_inner,
             scoring=scoring_metric,
-            n_jobs=n_cores // 2,
+            n_jobs=n_cores,
             n_trials=hpo_n_trials,
             verbose=2,
             callbacks=[dummy_gc]
@@ -87,7 +87,8 @@ def perform_hyperparameter_search( imba_pipeline, X, y, config, kfold_inner):
         raise ValueError(f"Unknown search method: {search_method}")
 
     # Fit the search estimator to get best parameters
-    search_estimator_best.fit(X, y)
+    fit_params = config.get('fit_params',{})
+    search_estimator_best.fit(X, y, **fit_params)
 
     # Extract best parameters
     best_params = search_estimator_best.best_params_

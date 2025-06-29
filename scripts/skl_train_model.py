@@ -1,5 +1,12 @@
 import os
 import sys
+from parallel.device_pin import pick_resources
+#pick_resources(
+ #   cores_required=22,
+  #  mem_required_gb=64,
+   # lock_dir="/tmp",
+    #wait_interval=5
+#)
 import time
 import yaml
 import shutil
@@ -57,6 +64,7 @@ def skl_drug_model(X, Y, drug, config):
     # get cross-validation seeds and parameters and set up cv objects
     cv_seed = config.get('cv_seed', 7)
     cv_splits = config.get('cv_splits', 5)
+    config['test_set'] = [(X_test, y_test)]
     kfold_outer = StratifiedKFold(n_splits=cv_splits, shuffle=True, random_state=cv_seed)
     kfold_inner = StratifiedKFold(n_splits=cv_splits, shuffle=True, random_state=cv_seed*2)
 
@@ -64,10 +72,11 @@ def skl_drug_model(X, Y, drug, config):
     search_method = config.get('search_method', 'optuna')
     nested_cv= config.get('nested_cv', True)
 
-    logging.info("This is the current config:\n"+yaml.dump(config))
+    
     
     # Initialize base model using the new function
-    model0 = get_model_for_device(config)
+    model0, config = get_model_for_device(config)
+    logging.info("This is the current config:\n"+yaml.dump(config))
 
     # Handle oversampling and get the initial pipeline and resampled data
     imba_pipeline = build_pipe(config, model0)
@@ -90,7 +99,8 @@ def skl_drug_model(X, Y, drug, config):
         cv_results = outer_cross_validate(
             search_estimator, X, y, 
             scoring=['balanced_accuracy', 'precision', 'recall', 'f1', 'average_precision', 'roc_auc'], 
-            cv=kfold_outer
+            cv=kfold_outer,
+            **config.get('fit_params',{})
         )
     else:
         # No hyperparameter search, just cross-validate the base model or best hpo model
@@ -105,7 +115,7 @@ def skl_drug_model(X, Y, drug, config):
 
     model0 = cv_estimator # Use the best estimator from search as the final model
      # fit this hpo model on training data 
-    model0.fit(X_train, y_train)
+    #model0.fit(X_train, y_train, **config.get('fit_params', {}))
     y_pred = model0.predict(X_test)
     conf_mat = confusion_matrix(y_test, y_pred)
     model_report = classification_report(y_test, y_pred, output_dict=True, labels=np.unique(y_pred))
