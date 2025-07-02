@@ -9,6 +9,7 @@ from sklearn.metrics import precision_score, accuracy_score, f1_score, roc_auc_s
 import matplotlib.pyplot as plt
 import seaborn as sns
 import argparse # Added argparse
+from tqdm import tqdm # Added tqdm
 
 # Add the parent directory to sys.path to import custom modules
 # Assuming the script is run from the root of the drug_sensitivity_mlpred repository
@@ -45,7 +46,7 @@ def summarize_drug_models(model_root_dir, data_file_path, main_config_file_path,
     if num_drugs_to_process is not None:
         drug_folders = drug_folders[:num_drugs_to_process]
 
-    for drug_folder_name in drug_folders:
+    for drug_folder_name in tqdm(drug_folders, desc=f"Processing {model_type} drug models"):
         drug_folder_path = os.path.join(model_root_dir, drug_folder_name)
         
         # Extract drug name from folder name (e.g., "BRD-A00077618-236-07-6::2.5::HTS")
@@ -166,7 +167,7 @@ def compare_model_types(model_configs, data_file_path, model_summary = None, out
     all_dfs = {}
     common_drugs = None
     if model_summary is None:
-        for model_type_name, config_paths in model_configs.items():
+        for model_type_name, config_paths in tqdm(model_configs.items(), desc="Summarizing all model types"):
             print(f"Processing {model_type_name} models...")
             df = summarize_drug_models(
                 config_paths['model_root_dir'],
@@ -216,13 +217,18 @@ def compare_model_types(model_configs, data_file_path, model_summary = None, out
     test_melted_df = all_models_df.melt(id_vars=['drug', 'model_type'], value_vars=test_metrics, 
                                         var_name='metric', value_name='score')
 
+    # Determine the number of unique metrics for palette generation
+    # Assuming cv_metrics and test_metrics have the same number of elements for hue
+    num_metrics = len(cv_metrics)
+    base_palette = sns.color_palette("tab10") # Changed to a more contrasting palette
+
     # Plot 1: Nested Cross-Validation Metrics
     plt.figure(figsize=(14, 9)) # Slightly larger figure size
     if plot_type == 'boxplot':
-        sns.boxplot(data=cv_melted_df, x='model_type', y='score', hue='metric', palette='Paired') # Changed palette
+        sns.boxplot(data=cv_melted_df, x='model_type', y='score', hue='metric', palette=base_palette)
     elif plot_type == 'violinplot':
-        sns.violinplot(data=cv_melted_df, x='model_type', y='score', hue='metric', palette='Paired', inner=None) # Changed palette, removed inner boxplot
-        sns.stripplot(data=cv_melted_df, x='model_type', y='score', hue='metric', palette='dark', jitter=0.2, dodge=True, size=3, alpha=0.7, legend=False) # Added scatter points, removed legend
+        sns.violinplot(data=cv_melted_df, x='model_type', y='score', hue='metric', palette=base_palette, inner="quartile", alpha=0.6) # Lighter violin plots, with quartile lines
+        sns.stripplot(data=cv_melted_df, x='model_type', y='score', hue='metric', palette=base_palette, jitter=0.2, dodge=True, size=1.5, alpha=0.9, legend=False) # Stripplot, matching colors, slightly darker
     
     plt.title('Comparison of Nested Cross-Validation Metrics Across Model Types', fontsize=16) # Increased title font size
     plt.xlabel('Model Type', fontsize=14) # Increased x-label font size
@@ -237,10 +243,10 @@ def compare_model_types(model_configs, data_file_path, model_summary = None, out
     # Plot 2: Best Model Test Metrics
     plt.figure(figsize=(14, 9)) # Slightly larger figure size
     if plot_type == 'boxplot':
-        sns.boxplot(data=test_melted_df, x='model_type', y='score', hue='metric', palette='Paired') # Changed palette
+        sns.boxplot(data=test_melted_df, x='model_type', y='score', hue='metric', palette=base_palette)
     elif plot_type == 'violinplot':
-        sns.violinplot(data=test_melted_df, x='model_type', y='score', hue='metric', palette='Paired', inner=None) # Changed palette, removed inner boxplot
-        sns.stripplot(data=test_melted_df, x='model_type', y='score', hue='metric', palette='dark', jitter=0.2, dodge=True, size=3, alpha=0.7, legend=False) # Added scatter points, removed legend
+        sns.violinplot(data=test_melted_df, x='model_type', y='score', hue='metric', palette=base_palette, inner="quartile", alpha=0.6) # Lighter violin plots, with quartile lines
+        sns.stripplot(data=test_melted_df, x='model_type', y='score', hue='metric', palette=base_palette, jitter=0.2, dodge=True, size=1.5, alpha=0.9, legend=False) # Stripplot, matching colors, slightly darker
     
     plt.title('Comparison of Best Model Test Metrics Across Model Types', fontsize=16) # Increased title font size
     plt.xlabel('Model Type', fontsize=14) # Increased x-label font size
@@ -275,7 +281,7 @@ def extract_and_copy_top_models_plots(all_models_df, model_configurations, outpu
         print(f"Error: '{metric}' column not found in all_models_df. Cannot extract top/bottom models.")
         return
 
-    for model_type, config in model_configurations.items():
+    for model_type, config in tqdm(model_configurations.items(), desc=f"Extracting {'bottom' if select_bottom else 'top'} {num_drugs} drugs"):
         print(f"\nProcessing {'bottom' if select_bottom else 'top'} drugs for model type: {model_type}")
         
         # Filter for the current model type and sort by the specified metric
@@ -297,7 +303,7 @@ def extract_and_copy_top_models_plots(all_models_df, model_configurations, outpu
         os.makedirs(target_dir, exist_ok=True)
         print(f"Created target directory: {target_dir}")
 
-        for _, row in selected_drugs_for_model_type.iterrows():
+        for _, row in tqdm(selected_drugs_for_model_type.iterrows(), desc=f"  Copying plots for {model_type}", leave=False):
             drug_name_full = row['drug']
             print(f"  Processing drug: {drug_name_full}")
             
@@ -399,7 +405,7 @@ if __name__ == '__main__':
         print("No existing summary file found. Generating new summary.")
         all_dfs = {}
         common_drugs = None
-        for model_type_name, config_paths in model_configurations.items():
+        for model_type_name, config_paths in tqdm(model_configurations.items(), desc="Summarizing all model types"):
             print(f"Processing {model_type_name} models...")
             df = summarize_drug_models(
                 config_paths['model_root_dir'],

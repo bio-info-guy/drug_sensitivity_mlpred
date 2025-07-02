@@ -9,7 +9,7 @@
     "scoring_metric": "average_precision",
     "search_method": "optuna",
     "nested_cv":true,
-    "hpo_n_trials": 100,
+    "hpo_n_trials": 500,
     "scale_data": false,
     "fixed_params": {
         "random_state": 42,
