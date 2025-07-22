@@ -20,6 +20,7 @@ from sklearn.model_selection import cross_validate
 from sklearn.model_selection import cross_val_score, KFold
 from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import make_scorer
+from sklearn.decomposition import PCA
 sys.path.append('../drug_sensitivity_mlpred/')
 from utils.config_loader import load_config# Import from new module
 from cross_validation_utils_ import outer_cross_validate
@@ -61,6 +62,21 @@ def skl_drug_model(X, Y, drug, config):
         X, y, test_size=0.2, random_state=config['train_test_split_seed']
     )
 
+    # Apply PCA if configured
+    pca_model = None
+    if config.get('pca', False):
+        n_components = min(X_train.shape[0], X_train.shape[1])
+        pca_model = PCA(n_components=n_components)
+        X_train = pca_model.fit_transform(X_train)
+        X_test = pca_model.transform(X_test)
+        logging.info(f"PCA applied with {n_components} components. New X_train shape: {X_train.shape}")
+        # Convert X_train and X_test back to DataFrame to maintain column names for feature importance
+        # This is a simplification, as PCA transforms to a new feature space.
+        # The feature importance calculation will need to handle this.
+        X_train = pd.DataFrame(X_train, columns=[f'PC_{i}' for i in range(X_train.shape[1])])
+        X_test = pd.DataFrame(X_test, columns=[f'PC_{i}' for i in range(X_test.shape[1])])
+
+
     # get cross-validation seeds and parameters and set up cv objects
     cv_seed = config.get('cv_seed', 7)
     cv_splits = config.get('cv_splits', 5)
@@ -100,6 +116,7 @@ def skl_drug_model(X, Y, drug, config):
             search_estimator, X, y, 
             scoring=['balanced_accuracy', 'precision', 'recall', 'f1', 'average_precision', 'roc_auc'], 
             cv=kfold_outer,
+            config=config, # Pass the config dictionary
             **config.get('fit_params',{})
         )
     else:
@@ -120,7 +137,7 @@ def skl_drug_model(X, Y, drug, config):
     conf_mat = confusion_matrix(y_test, y_pred)
     model_report = classification_report(y_test, y_pred, output_dict=True, labels=np.unique(y_pred))
     model_report = pd.DataFrame(model_report).transpose()
-    feature_importance = calculate_feature_importance(model0, X_train)
+    feature_importance = calculate_feature_importance(model0, X_train, pca_object=pca_model) # Pass pca_model
     # final results in a dictionary
     final_results = {
         'best_model': model0, # This will be the best estimator from search or the original imba_pipeline
@@ -136,7 +153,8 @@ def skl_drug_model(X, Y, drug, config):
         'oversample': config['use_oversampling'],
         'confusion_matrix':conf_mat,
         'report':model_report,
-        'feature_importance':feature_importance
+        'feature_importance':feature_importance,
+        'pca_model': pca_model
     }
 
     return final_results

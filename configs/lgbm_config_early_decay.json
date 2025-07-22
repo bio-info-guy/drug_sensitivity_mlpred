@@ -12,6 +12,7 @@
     "scale_data": false,
     "early_stop": true,
     "lr_decay": true,
+    "pca": true,
     "fixed_params": {
         "random_state": 42,
         "n_estimators":1000,

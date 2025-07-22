@@ -141,6 +141,30 @@ def summarize_drug_models(model_root_dir, data_file_path, main_config_file_path,
 
             # Combine all results
             combined_entry = {**cv_stats, **test_metrics}
+
+            # --- Feature Importance Plotting ---
+            feature_importance_filename_pattern = f"{model_type}_feature_importance_{drug_name_full}.csv"
+            feature_importance_file = None
+            for f in os.listdir(drug_folder_path):
+                if f == feature_importance_filename_pattern:
+                    feature_importance_file = os.path.join(drug_folder_path, f)
+                    break
+            
+            if feature_importance_file:
+                try:
+                    fi_df = pd.read_csv(feature_importance_file)
+                    # Ensure 'Feature' and 'Importance' columns exist
+                    if 'Feature' in fi_df.columns and 'Importance' in fi_df.columns:
+                        fi_output_dir = os.path.join(drug_folder_path, 'feature_importance_plots')
+                        plot_feature_importance(fi_df, drug_name_full, model_type, fi_output_dir)
+                    else:
+                        print(f"Warning: Feature importance file {feature_importance_file} missing 'Feature' or 'Importance' columns. Skipping plot.")
+                except Exception as fi_e:
+                    print(f"Error reading or plotting feature importance for {feature_importance_file}: {fi_e}")
+            else:
+                print(f"No feature importance file found for {drug_name_full} with pattern {feature_importance_filename_pattern}. Skipping plot.")
+            # --- End Feature Importance Plotting ---
+
             all_results.append(combined_entry)
 
         except Exception as e:
@@ -259,6 +283,36 @@ def compare_model_types(model_configs, data_file_path, model_summary = None, out
     plt.close()
 
     print(f"Comparison plots saved to {output_dir}")
+
+def plot_feature_importance(feature_importance_df, drug_name, model_type, output_dir):
+    """
+    Generates and saves a horizontal bar plot of feature importances.
+
+    Args:
+        feature_importance_df (pd.DataFrame): DataFrame with 'Feature' and 'Importance' columns.
+        drug_name (str): Name of the drug for the plot title and filename.
+        model_type (str): Type of the model for the plot title and filename.
+        output_dir (str): Directory to save the plot.
+    """
+    if feature_importance_df.empty:
+        print(f"No feature importance data to plot for {drug_name} ({model_type}).")
+        return
+
+    # Sort by importance and take top 10
+    top_features = feature_importance_df.sort_values(by='Importance', ascending=False).head(10)
+
+    plt.figure(figsize=(10, 6))
+    sns.barplot(x='Importance', y='Feature', data=top_features, palette='viridis')
+    plt.title(f'Top 10 Feature Importances for {drug_name} ({model_type})', fontsize=14)
+    plt.xlabel('Importance', fontsize=12)
+    plt.ylabel('Feature', fontsize=12)
+    plt.tight_layout()
+
+    plot_filename = f"{model_type}_feature_importance_{drug_name}.png"
+    os.makedirs(output_dir, exist_ok=True)
+    plt.savefig(os.path.join(output_dir, plot_filename))
+    plt.close()
+    print(f"Saved feature importance plot to {os.path.join(output_dir, plot_filename)}")
 
 
 def extract_and_copy_top_models_plots(all_models_df, model_configurations, output_base_dir, num_drugs, metric, select_bottom):

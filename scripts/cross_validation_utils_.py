@@ -12,14 +12,17 @@ from sklearn.model_selection import check_cv, StratifiedKFold, GridSearchCV
 from sklearn.experimental import enable_halving_search_cv
 from sklearn.model_selection import HalvingRandomSearchCV
 from sklearn.base import clone
+from sklearn.decomposition import PCA
+import pandas as pd
 
 try:
     from optuna.integration import OptunaSearchCV
 except ImportError:
     OptunaSearchCV = None
+    OptunaSearchCV = None
 
 
-def outer_cross_validate(estimator, X, y=None, cv=None, scoring=None, random_state=None, **fit_params):
+def outer_cross_validate(estimator, X, y=None, cv=None, scoring=None, random_state=None, config=None, **fit_params):
     """
     Perform cross-validation similar to sklearn's cross_validate but also record best parameters if estimator is an HPO 
     
@@ -37,6 +40,8 @@ def outer_cross_validate(estimator, X, y=None, cv=None, scoring=None, random_sta
         Strategy to evaluate the performance of the cross-validated model on the test set.
     random_state : int, default=None
         Random state for cross-validation splitting.
+    config : dict, default=None
+        Configuration dictionary, used to check for PCA option.
         
     Returns:
     --------
@@ -102,6 +107,17 @@ def outer_cross_validate(estimator, X, y=None, cv=None, scoring=None, random_sta
                 y_train, y_test = y[train_idx], y[test_idx]
         else:
             y_train, y_test = None, None
+
+        # Apply PCA if configured for outer cross-validation
+        if config and config.get('pca', False):
+            n_components = min(X_train.shape[0], X_train.shape[1])
+            pca_outer = PCA(n_components=n_components)
+            X_train = pca_outer.fit_transform(X_train)
+            X_test = pca_outer.transform(X_test)
+            # Convert back to DataFrame to maintain column names for consistency
+            X_train = pd.DataFrame(X_train, columns=[f'PC_{i}' for i in range(X_train.shape[1])])
+            X_test = pd.DataFrame(X_test, columns=[f'PC_{i}' for i in range(X_test.shape[1])])
+
         # Fit the estimator and measure training time
         fit_params['classifier__eval_set'] = [(X_test, y_test)]
         start_fit_time = time.time()
