@@ -109,9 +109,10 @@ def get_model_for_device(config):
             if len(cb) > 0:
                 fit_params['classifier__callbacks'] = cb
             config['fit_params'] = fit_params
-            config['n_cores'] = 1
-            fixed_params['n_jobs'] = n_cores+1
+            config['n_cores'] = 2
+            fixed_params['n_jobs'] = max(n_cores // 2, 1)
             fixed_params['metric'] = None
+            fixed_params['importance_type'] = 'gain'
             config.pop('test_set')
             return LGBMClassifier(**fixed_params), config
     elif model_name in MODEL_TYPES:

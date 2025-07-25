@@ -14,13 +14,15 @@ import argparse
 import pandas as pd
 import numpy as np
 from numpy import loadtxt
+from imblearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA, TruncatedSVD
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.model_selection import cross_validate
 from sklearn.model_selection import cross_val_score, KFold
 from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import make_scorer
-from sklearn.decomposition import PCA
 sys.path.append('../drug_sensitivity_mlpred/')
 from utils.config_loader import load_config# Import from new module
 from cross_validation_utils_ import outer_cross_validate
@@ -61,12 +63,15 @@ def skl_drug_model(X, Y, drug, config):
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=config['train_test_split_seed']
     )
-
+    X_train_orig = X_train
     # Apply PCA if configured
     pca_model = None
     if config.get('pca', False):
         n_components = min(X_train.shape[0], X_train.shape[1])
-        pca_model = PCA(n_components=n_components)
+        # There is quite a difference between scaling before PCA
+        #pca_model = Pipeline([('scaler', StandardScaler()), ('pca', TruncatedSVD(n_components=n_components))])
+        pca_model = Pipeline([('pca', TruncatedSVD(n_components=n_components))])
+ 
         X_train = pca_model.fit_transform(X_train)
         X_test = pca_model.transform(X_test)
         logging.info(f"PCA applied with {n_components} components. New X_train shape: {X_train.shape}")
@@ -137,7 +142,7 @@ def skl_drug_model(X, Y, drug, config):
     conf_mat = confusion_matrix(y_test, y_pred)
     model_report = classification_report(y_test, y_pred, output_dict=True, labels=np.unique(y_pred))
     model_report = pd.DataFrame(model_report).transpose()
-    feature_importance = calculate_feature_importance(model0, X_train, pca_object=pca_model) # Pass pca_model
+    feature_importance = calculate_feature_importance(model0,  X_train_orig, pca_object=pca_model['pca']) # Pass pca_model
     # final results in a dictionary
     final_results = {
         'best_model': model0, # This will be the best estimator from search or the original imba_pipeline

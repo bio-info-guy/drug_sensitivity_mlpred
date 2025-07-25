@@ -12,7 +12,9 @@ from sklearn.model_selection import check_cv, StratifiedKFold, GridSearchCV
 from sklearn.experimental import enable_halving_search_cv
 from sklearn.model_selection import HalvingRandomSearchCV
 from sklearn.base import clone
-from sklearn.decomposition import PCA
+from imblearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA, TruncatedSVD
 import pandas as pd
 
 try:
@@ -111,7 +113,9 @@ def outer_cross_validate(estimator, X, y=None, cv=None, scoring=None, random_sta
         # Apply PCA if configured for outer cross-validation
         if config and config.get('pca', False):
             n_components = min(X_train.shape[0], X_train.shape[1])
-            pca_outer = PCA(n_components=n_components)
+            #pca_outer = Pipeline([('scaler', StandardScaler()), ('pca', TruncatedSVD(n_components=n_components))])
+            pca_outer = Pipeline([('pca', PCA(n_components=n_components))])
+
             X_train = pca_outer.fit_transform(X_train)
             X_test = pca_outer.transform(X_test)
             # Convert back to DataFrame to maintain column names for consistency

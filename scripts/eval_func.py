@@ -3,6 +3,13 @@ from sklearn.preprocessing import StandardScaler
 import numpy as np
 import logging
 
+def stable_softmax(x):
+    # Subtract the maximum value for numerical stability
+    shifted_x = x - np.max(x)
+    exp_shifted_x = np.exp(shifted_x)
+    return exp_shifted_x / np.sum(exp_shifted_x)
+
+
 def calculate_feature_importance(pipeline_model, X_train, pca_object=None):
     """
     Calculates feature importance based on model type and training data.
@@ -18,22 +25,25 @@ def calculate_feature_importance(pipeline_model, X_train, pca_object=None):
     classifier = pipeline_model.named_steps['classifier']
     
     df_dict = {}
-    
+    df_dict['Feature'] = X_train.columns
     # Tree-based models
     if hasattr(classifier, 'feature_importances_'):
         if pca_object is not None:
             # Calculate feature importance using PCA components
-            df_dict['Feature'] = pca_object.feature_names_in_
-            df_dict['Importance'] = ((classifier.feature_importances_* np.sqrt(pca_object.explained_variance_))[:, np.newaxis] * np.abs(pca_object.components_)).sum(axis=0)
-            df_dict['pca_importance'] = (classifier.feature_importances_[:, np.newaxis] * np.abs(pca_object.components_)).sum(axis=0)
-            df_dict['pca_importance_absum'] = np.abs((classifier.feature_importances_[:, np.newaxis] * pca_object.components_).sum(axis=0))
-            df_dict['pca_importance_sd'] = ((classifier.feature_importances_* np.sqrt(pca_object.explained_variance_))[:, np.newaxis] * np.abs(pca_object.components_)).sum(axis=0)
-            df_dict['pca_importance_var'] = ((classifier.feature_importances_* pca_object.explained_variance_)[:, np.newaxis] * np.abs(pca_object.components_)).sum(axis=0)
-            df_dict['pca_importance_log'] = ((classifier.feature_importances_* np.log1p(pca_object.explained_variance_))[:, np.newaxis] * np.abs(pca_object.components_)).sum(axis=0)
-            df_dict['pca_importance_ratio'] = ((classifier.feature_importances_* np.log1p(pca_object.explained_variance_ratio_))[:, np.newaxis] * np.abs(pca_object.components_)).sum(axis=0)
-
+            importance = classifier.feature_importances_
+            pc_var = pca_object.explained_variance_
+            comps = pca_object.components_
+            df_dict['pca_importance'] = (importance[:, np.newaxis] * np.abs(comps/X_train.std().values)).sum(axis=0)
+            df_dict['pca_importance_scaled'] = ((importance* np.sqrt(pc_var))[:, np.newaxis] * np.abs(comps/X_train.std().values)).sum(axis=0)
+            df_dict['pca_importance_absum'] = np.abs((importance[:, np.newaxis] * comps).sum(axis=0))
+            df_dict['pca_importance_sd'] = ((importance* np.sqrt(pc_var))[:, np.newaxis] * np.abs(comps)).sum(axis=0)
+            df_dict['pca_importance_var'] = ((importance* pc_var)[:, np.newaxis] * np.abs(comps)).sum(axis=0)
+            df_dict['pca_importance_log'] = ((importance* np.log1p(pc_var))[:, np.newaxis] * np.abs(comps)).sum(axis=0)
+            df_dict['pca_importance_ratio'] = ((importance* pca_object.explained_variance_ratio_)[:, np.newaxis] * np.abs(comps)).sum(axis=0)
+            df_dict['pca_softmax_importance'] = (stable_softmax(importance)[:,np.newaxis] *np.abs(comps)).sum(axis = 0)
+            df_dict['Importance'] = df_dict['pca_importance_scaled']
+            
         else:
-            df_dict['Feature'] = X_train.columns
             df_dict['Importance'] = classifier.feature_importances_
 
 
@@ -43,14 +53,14 @@ def calculate_feature_importance(pipeline_model, X_train, pca_object=None):
     
     # Linear models
     elif hasattr(classifier, 'coef_'):
+
+        feature_names = X_train.columns
         coef = classifier.coef_[0] if classifier.coef_.ndim > 1 else classifier.coef_
         coef1 = np.full(len(feature_names), np.nan)
         if pca_object is not None:
-            coef = np.abs(coef[:, np.newaxis] * pca_object.components_).sum(axis=0)
-            coef1 = (coef[:, np.newaxis] * np.abs(pca_object.components_)).sum(axis=0)
-            feature_names = pca_object.feature_names_in_
-        else:
-            feature_names = X_train.columns
+            coef = np.abs(coef[:, np.newaxis] * (pca_object.components_/X_train.std().values)).sum(axis=0)
+            coef1 = (coef[:, np.newaxis] * np.abs(pca_object.components_/X_train.std().values)).sum(axis=0)
+
         # Check if StandardScaler was used in the pipeline
         scaler_used = False
         if 'scaling' in pipeline_model.named_steps:

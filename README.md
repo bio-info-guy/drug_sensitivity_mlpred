@@ -70,3 +70,17 @@ To get started with this project:
 │   └── misc.py               # Miscellaneous helper functions
 ├── README.md                 # Project overview and documentation
 └── ...                       # Other project files (e.g., Dockerfile, .gitignore)
+
+```
+
+## Miscellaneous Commands to Run Training and Plotting
+
+1. submitting slurm training script
+```
+bash bash_submit_slurm/submit_all_drug_models_orion.sh --data input/combined_DepMap_21Q3.csv --config configs/lgbm_config_early_decay.json --n-cores 10 --slurm-logs-dir slurm_logs --out-dir output/
+```
+
+2. plotting summary plots and importance scores
+```
+python scripts/summarize_models.py --model_root_dirs output/LGBMClassifier_intelligent_kare/,output/RandomForestClassifier_fervent_davinci/,output/SGDClassifier_strange_visvesvaraya/ --data_file_in input/combined_DepMap_21Q3.csv --outdir compare_lgb_rf_sgd --num_top_drugs 10 --metric_for_top_drugs test_average_precision --plot_type violinplot
+```

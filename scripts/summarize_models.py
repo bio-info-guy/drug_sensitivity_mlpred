@@ -46,6 +46,26 @@ def summarize_drug_models(model_root_dir, data_file_path, main_config_file_path,
     if num_drugs_to_process is not None:
         drug_folders = drug_folders[:num_drugs_to_process]
 
+    train_test_split_seed = main_config.get('train_test_split_seed', 20) # Default to 20 if not found
+    X_train, X_test, Y_train, Y_test = train_test_split(
+                X_all, Y_all, test_size=0.2, random_state=train_test_split_seed
+            )
+    
+    if main_config.get('pca',False):
+        from sklearn.decomposition import PCA, TruncatedSVD
+        n_components = min(X_train.shape[0], X_train.shape[1])
+        # There is quite a difference between scaling before PCA
+        #pca_model = Pipeline([('scaler', StandardScaler()), ('pca', TruncatedSVD(n_components=n_components))])
+        pca_model = TruncatedSVD(n_components=n_components)
+ 
+        X_train = pca_model.fit_transform(X_train)
+        X_test = pca_model.transform(X_test)
+        # Convert X_train and X_test back to DataFrame to maintain column names for feature importance
+        # This is a simplification, as PCA transforms to a new feature space.
+        # The feature importance calculation will need to handle this.
+        X_train = pd.DataFrame(X_train, columns=[f'PC_{i}' for i in range(X_train.shape[1])])
+        X_test = pd.DataFrame(X_test, columns=[f'PC_{i}' for i in range(X_test.shape[1])])
+
     for drug_folder_name in tqdm(drug_folders, desc=f"Processing {model_type} drug models"):
         drug_folder_path = os.path.join(model_root_dir, drug_folder_name)
         
@@ -99,15 +119,9 @@ def summarize_drug_models(model_root_dir, data_file_path, main_config_file_path,
                 print(f"Warning: Drug '{drug_name_full}' not found in data file. Skipping.")
                 continue
             
-            y = Y_all[drug_name_full]
+            y_test = Y_test[drug_name_full]
             
             # Use the train_test_split_seed from the main config
-            train_test_split_seed = main_config.get('train_test_split_seed', 20) # Default to 20 if not found
-            
-            X_train, X_test, y_train, y_test = train_test_split(
-                X_all, y, test_size=0.2, random_state=train_test_split_seed
-            )
-
             # Make predictions
             y_pred = model.predict(X_test)
             
@@ -150,7 +164,7 @@ def summarize_drug_models(model_root_dir, data_file_path, main_config_file_path,
                     feature_importance_file = os.path.join(drug_folder_path, f)
                     break
             
-            if feature_importance_file:
+            if False:
                 try:
                     fi_df = pd.read_csv(feature_importance_file)
                     # Ensure 'Feature' and 'Importance' columns exist
@@ -161,8 +175,8 @@ def summarize_drug_models(model_root_dir, data_file_path, main_config_file_path,
                         print(f"Warning: Feature importance file {feature_importance_file} missing 'Feature' or 'Importance' columns. Skipping plot.")
                 except Exception as fi_e:
                     print(f"Error reading or plotting feature importance for {feature_importance_file}: {fi_e}")
-            else:
-                print(f"No feature importance file found for {drug_name_full} with pattern {feature_importance_filename_pattern}. Skipping plot.")
+            #else:
+             #   print(f"No feature importance file found for {drug_name_full} with pattern {feature_importance_filename_pattern}. Skipping plot.")
             # --- End Feature Importance Plotting ---
 
             all_results.append(combined_entry)
