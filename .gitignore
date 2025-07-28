@@ -1,6 +1,6 @@
 .DS_Store
 /input
-/output
+*output*
 *.out
 .vscode/
 *_output/
@@ -14,4 +14,4 @@ new_data/
 *plots*
 *results*
 /bash_submit_slurm/
-/old_scripts/
+/old_analysis/
