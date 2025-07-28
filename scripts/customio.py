@@ -29,6 +29,30 @@ def read_data(fpath: str):
     
     return X, drug_y_all, drug_list
 
+
+def read_data2(xpath: str, ypath:str):
+
+    # unlike the previous function, X and y are different files now
+    X = pd.read_csv(xpath)
+    y = pd.read_csv(ypath)
+    assert X.shape[0] == y.shape[0], 'X and y have different number of samples'
+    # Identify drug columns based on the "BRD-" prefix
+
+    all_columns = X.columns.tolist()
+    drug_columns = [col for col in all_columns if col.startswith('BRD-')]
+    
+    if X.shape[1] > 0 and 'cell_line_name' in X.keys(): # Ensure there are columns left after dropping drug columns
+        X = X.drop(columns = ['cell_line_name']) # Drop the first column (ID column)
+    else:
+        # This case means all columns were either drug columns or the first ID column.
+        # If there are no features left, X should be an empty DataFrame.
+        X = pd.DataFrame() 
+
+    drug_y_all = y
+    drug_list = drug_y_all.columns.tolist()
+    
+    return X, drug_y_all, drug_list
+
 def write_drug_model_result(model_results, out_dir):
     model0 = model_results['best_model']
     oversample = 'oversample' if model_results['oversample'] else ''
