@@ -8,13 +8,14 @@ cross_validate functionality with support for parameter searchers and detailed t
 import numpy as np
 import time
 from sklearn.metrics import get_scorer
-from sklearn.model_selection import check_cv, StratifiedKFold, GridSearchCV
+from sklearn.model_selection import check_cv, StratifiedKFold, GridSearchCV, KFold
 from sklearn.experimental import enable_halving_search_cv
 from sklearn.model_selection import HalvingRandomSearchCV
 from sklearn.base import clone
 from imblearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA, TruncatedSVD
+from scripts.preprocess import get_y_type, apply_pca_pipeline
 import pandas as pd
 
 try:
@@ -53,13 +54,20 @@ def outer_cross_validate(estimator, X, y=None, cv=None, scoring=None, random_sta
     """
     
     # Set default cv if None
+    if get_y_type(y.to_frame() if isinstance(y, pd.Series) else y) == 'binary':
+        cv_fun = StratifiedKFold
+        classify = True
+    else:
+        cv_fun = KFold
+        classify = False
+
     if cv is None:
-        cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=random_state)
+        cv = cv_fun(n_splits=5, shuffle=True, random_state=random_state)
     elif isinstance(cv, int):
-        cv = StratifiedKFold(n_splits=cv, shuffle=True, random_state=random_state)
+        cv = cv_fun(n_splits=cv, shuffle=True, random_state=random_state)
     
     # Convert cv to cross-validation generator
-    cv = check_cv(cv, y, classifier=True)
+    cv = check_cv(cv, y, classifier=classify)
     
     # Handle scoring parameter
     if scoring is None:
@@ -112,18 +120,10 @@ def outer_cross_validate(estimator, X, y=None, cv=None, scoring=None, random_sta
 
         # Apply PCA if configured for outer cross-validation
         if config and config.get('pca', False):
-            n_components = min(X_train.shape[0], X_train.shape[1])
-            #pca_outer = Pipeline([('scaler', StandardScaler()), ('pca', TruncatedSVD(n_components=n_components))])
-            pca_outer = Pipeline([('pca', PCA(n_components=n_components))])
-
-            X_train = pca_outer.fit_transform(X_train)
-            X_test = pca_outer.transform(X_test)
-            # Convert back to DataFrame to maintain column names for consistency
-            X_train = pd.DataFrame(X_train, columns=[f'PC_{i}' for i in range(X_train.shape[1])])
-            X_test = pd.DataFrame(X_test, columns=[f'PC_{i}' for i in range(X_test.shape[1])])
+            X_train, X_test, y_train, pca_model = apply_pca_pipeline(X_train, X_test, y_train, config)
 
         # Fit the estimator and measure training time
-        fit_params['classifier__eval_set'] = [(X_test, y_test)]
+        fit_params['model__eval_set'] = [(X_test, y_test)]
         start_fit_time = time.time()
 
         estimator_fold.fit(X_train, y_train, **fit_params)

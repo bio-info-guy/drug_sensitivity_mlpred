@@ -5,6 +5,8 @@ import numpy as np
 import os
 from sklearn_evaluation.plot import confusion_matrix, ConfusionMatrix
 from decimal import Decimal
+from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
+from scipy.stats import norm
 
 def plot_roc_aupr_curves(best_model, X_test, y_test, drug, output_dir=".", threshold_type='best_precision'):
     """
@@ -21,7 +23,7 @@ def plot_roc_aupr_curves(best_model, X_test, y_test, drug, output_dir=".", thres
     """
     os.makedirs(output_dir, exist_ok=True)
     if hasattr(best_model, 'named_steps'):
-        model_class= str(best_model['classifier']).split('(')[0]
+        model_class= str(best_model['model']).split('(')[0]
     else:
         model_class= str(best_model).split('(')[0]
     # Get predicted probabilities for the positive class
@@ -129,6 +131,94 @@ def plot_roc_aupr_curves(best_model, X_test, y_test, drug, output_dir=".", thres
     fig.savefig(os.path.join(output_dir, drug, f'{drug}_roc_aupr_cm.png')) # Updated filename
     
     plt.close()
+
+def plot_regression_evaluation(best_model, X_test, y_test, target_name, output_dir="."):
+    """
+    Generates and saves a set of standard evaluation plots for a regression model.
+
+    The output figure contains three subplots:
+    1. Predicted vs. Actual values, annotated with the R-squared score.
+    2. Residuals vs. Predicted values, annotated with MAE and RMSE.
+    3. A histogram of the residuals, overlaid with a normal distribution curve.
+
+    Args:
+        model: The trained regression model (must have a .predict() method).
+        X_test (pd.DataFrame or np.ndarray): Test features.
+        y_test (pd.Series or np.ndarray): True target values for the test set.
+        target_name (str): Name of the target variable for plot titles and filenames.
+        output_dir (str, optional): Directory to save the plot. Defaults to ".".
+    """
+    # Ensure the output directory exists
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Get model name and predictions
+    if hasattr(best_model, 'named_steps'):
+        model_class= str(best_model['model']).split('(')[0]
+    else:
+        model_class= str(best_model).split('(')[0]
+    y_pred = model.predict(X_test)
+    
+    # Calculate residuals and key metrics
+    residuals = y_test - y_pred
+    r2 = r2_score(y_test, y_pred)
+    mae = mean_absolute_error(y_test, y_pred)
+    rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+
+    # --- Plotting ---
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+    fig.suptitle(f'Regression Evaluation for {model_class} on "{target_name}"', fontsize=16)
+
+    # 1. Predicted vs. Actual Plot
+    ax1 = axes[0]
+    ax1.scatter(y_test, y_pred, alpha=0.6, edgecolors='k')
+    ax1.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'r--', lw=2, label='Perfect Prediction')
+    ax1.set_xlabel("Actual Values")
+    ax1.set_ylabel("Predicted Values")
+    ax1.set_title("Predicted vs. Actual")
+    ax1.text(0.05, 0.95, f'$R^2 = {r2:.3f}$', transform=ax1.transAxes, fontsize=12,
+             verticalalignment='top', bbox=dict(boxstyle='round,pad=0.3', fc='wheat', alpha=0.5))
+    ax1.legend(loc='lower right')
+    ax1.grid(True, linestyle='--', alpha=0.6)
+
+    # 2. Residuals vs. Predicted Plot
+    ax2 = axes[1]
+    ax2.scatter(y_pred, residuals, alpha=0.6, edgecolors='k')
+    ax2.axhline(y=0, color='r', linestyle='--', lw=2)
+    ax2.set_xlabel("Predicted Values")
+    ax2.set_ylabel("Residuals (Actual - Predicted)")
+    ax2.set_title("Residuals vs. Predicted")
+    ax2.text(0.05, 0.95, f'MAE = {mae:.3f}\nRMSE = {rmse:.3f}', transform=ax2.transAxes, 
+             fontsize=12, verticalalignment='top', bbox=dict(boxstyle='round,pad=0.3', fc='wheat', alpha=0.5))
+    ax2.grid(True, linestyle='--', alpha=0.6)
+
+    # 3. Residuals Distribution Plot
+    ax3 = axes[2]
+    # Fit a normal distribution to the data
+    mu, std = norm.fit(residuals)
+    ax3.hist(residuals, bins=30, density=True, alpha=0.7, color='C0', label='Residuals')
+    # Plot the PDF.
+    xmin, xmax = ax3.get_xlim()
+    x = np.linspace(xmin, xmax, 100)
+    p = norm.pdf(x, mu, std)
+    ax3.plot(x, p, 'k', linewidth=2, label='Normal Dist. Fit')
+    ax3.set_xlabel("Residual Value")
+    ax3.set_ylabel("Density")
+    ax3.set_title(f'Distribution of Residuals\n($\mu={mu:.2f}$, $\sigma={std:.2f}$)')
+    ax3.legend()
+    ax3.grid(True, linestyle='--', alpha=0.6)
+
+    # --- Final Touches and Saving ---
+    fig.tight_layout(rect=[0, 0.03, 1, 0.95]) # Adjust layout to make room for suptitle
+    
+    # Save the figure
+    filename = os.path.join(output_dir, f'{target_name}_{model_class}_regression_evaluation.png')
+    fig.savefig(filename, dpi=150)
+    print(f"✅ Regression evaluation plot saved to: {filename}")
+    
+    plt.close(fig) # Close the plot to free up memory
+
+
+
 
 if __name__ == '__main__':
     # Example usage (for testing purposes)

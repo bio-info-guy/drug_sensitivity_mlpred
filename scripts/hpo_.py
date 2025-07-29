@@ -8,20 +8,17 @@ except ImportError:
 import logging
 from utils.misc import dummy_gc
 
-def perform_hyperparameter_search( imba_pipeline, X, y, config, kfold_inner, eval_set=None):
+def perform_hyperparameter_search(imba_pipeline, X, y, config, kfold_inner, y_type, eval_set=None):
     """
     Performs hyperparameter search using GridSearchCV, HalvingRandomSearchCV, or OptunaSearchCV.
-
     Args:
         base_estimator: The base estimator or pipeline object.
         X: Feature matrix.
         y: Target vector.
         config: Configuration dictionary with model parameters.
-        n_cores: Number of cores to use for parallel processing.
         kfold_inner: Inner cross-validation strategy.
-        oversample_flag: Boolean indicating if oversampling is used.
-        imba_pipeline: The pipeline used for hyperparameter search.
-
+        y_type: Type of y, either 'binary' or 'continuous'.
+        eval_set: Evaluation set for early stopping.
     Returns:
         A tuple containing:
             - best_estimator: The best estimator found by the search.
@@ -29,12 +26,33 @@ def perform_hyperparameter_search( imba_pipeline, X, y, config, kfold_inner, eva
     """
     search_params = config.get('search_params', {})
     search_method = config.get('search_method', 'gridcv')
-    scoring_metric = config.get('scoring_metric', 'average_precision')
+    
+    # Define valid scoring metrics for classification and regression
+    classification_metrics = ['balanced_accuracy', 'precision', 'average_precision', 'recall', 'f1', 'roc_auc']
+    regression_metrics = ['r2', 'neg_mean_squared_error', 'neg_mean_absolute_error', 'neg_mean_gamma_deviance']
+
+    # Determine default scoring metric based on y_type
+    if y_type == 'binary':
+        default_scoring_metric = 'average_precision'
+        valid_metrics = classification_metrics
+    else:
+        default_scoring_metric = 'r2'
+        valid_metrics = regression_metrics
+
+    scoring_metric = config.get('scoring_metric', default_scoring_metric)
+
+    # Check if the provided scoring_metric is valid for the given y_type
+    if scoring_metric not in valid_metrics:
+        logging.warning(
+            f"Invalid scoring metric '{scoring_metric}' for {y_type} task. "
+            f"Falling back to default: '{default_scoring_metric}'"
+        )
+        scoring_metric = default_scoring_metric
     cv_splits = config.get('cv_splits', 5)
     n_cores = max(1, config.get('n_cores', 1))
     if not search_params:
         return imba_pipeline, None, None
-    final_search_parameters = {'classifier__' + key: search_params[key] for key in search_params}
+    final_search_parameters = {'model__' + key: search_params[key] for key in search_params}
 
     search_estimator = None
     if search_method == 'gridcv':

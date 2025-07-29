@@ -3,10 +3,11 @@ from sklearn.preprocessing import StandardScaler
 import numpy as np
 import logging
 import sys
-from xgboost import XGBClassifier
+from xgboost import XGBClassifier, XGBRegressor
 from sklearn.ensemble import RandomForestClassifier as skl_rf
-from sklearn.linear_model import SGDClassifier
-from lightgbm import LGBMClassifier
+from sklearn.ensemble import RandomForestRegressor as skl_rfr
+from sklearn.linear_model import SGDClassifier, SGDRegressor
+from lightgbm import LGBMClassifier, LGBMRegressor
 import lightgbm as lgb
 from imblearn.over_sampling import RandomOverSampler, SMOTE
 from imblearn.pipeline import Pipeline, make_pipeline
@@ -16,10 +17,14 @@ from parallel.device_pin import set_cuda_device, pick_free_gpu
 import logging
 
 MODEL_TYPES = {
-    'XGBClassifier': XGBClassifier,
-    'RandomForestClassifier': skl_rf,
-    'SGDClassifier': SGDClassifier,
-    'LGBMClassifier': LGBMClassifier# Added for GPU RandomForest
+    'xgb_classifier': XGBClassifier,
+    'xgb_regressor': XGBRegressor,
+    'randomforest_classifier': skl_rf,
+    'randomforest_regressor': skl_rfr,
+    'sgd_classifier': SGDClassifier,
+    'sgd_regressor': SGDRegressor,
+    'lgbm_classifier': LGBMClassifier,
+    'lgbm_regressor': LGBMRegressor
 }
 
 # Define oversampler types
@@ -43,16 +48,29 @@ class multi_EarlyStopCB_wrapper:
             self.CB_[str(env.model)](env)
 
 
-def get_model_for_device(config):
-
-    model_name = config['model_type']
-    device = config.get('device', 'cpu') # Default to CPU if not specified
+def get_model_for_device(config, y_type):
+    """
+    Get the model for the specified device and y_type.
+    Args:
+        config (dict): Configuration dictionary.
+        y_type (str): Type of y, either 'binary' or 'continuous'.
+    Returns:
+        model: The model object.
+        config: The updated config object.
+    """
+    model_base_name = config['model_type']
+    device = config.get('device', 'cpu')  # Default to CPU if not specified
+    # Determine if the task is classification or regression
+    if y_type == 'binary':
+        model_name = f"{model_base_name}_classifier"
+    else:
+        model_name = f"{model_base_name}_regressor"
     fixed_params = config.get('fixed_params', {})
     search_method = config.get('search_method', None) # Get search method from config
     n_cores = config.get('n_cores', 1)
     # Ensure device is 'cpu' for models that don't support GPU
-    if model_name not in ['XGBClassifier', 'RandomForestClassifier']:
-        device = 'cpu' # Force to CPU if GPU is requested for unsupported models
+    if model_base_name not in ['xgb', 'randomforest']:
+        device = 'cpu'  # Force to CPU if GPU is requested for unsupported models
     if device == 'cuda':
         logging.info('running on gpu')
         #set_cuda_device()
@@ -66,64 +84,66 @@ def get_model_for_device(config):
     else: # GPU models (device == 'cuda')
         fixed_params['n_jobs'] = 1 # n_jobs is effectively 1 for GPU models
     logging.info(f"using {fixed_params['n_jobs']} for model training")
-    if model_name == 'XGBClassifier':
+    
+    model_class = MODEL_TYPES[model_name]
+    
+    if model_base_name == 'xgb':
         if device == 'cuda':
-            # For GPU XGBoost, set device and tree_method
             logging.info('XGBoost using cuda')
-            logging.info('XGBoost using cuda')
-            return XGBClassifier(device='cuda', tree_method='hist', **fixed_params), config
+            return model_class(device='cuda', tree_method='hist', **fixed_params), config
         else:
-            # For CPU XGBoost, use default or specified n_jobs
-            logging.info('XGBoost using cpu')
             logging.info('XGBoost using cpu')
             config['n_cores'] = 2
-            return XGBClassifier(**fixed_params), config
-    elif model_name == 'RandomForestClassifier':
+            return model_class(**fixed_params), config
+    elif model_base_name == 'randomforest':
         if device == 'cuda':
-            # For GPU RandomForest, use cuml's RandomForestClassifier
-            from cuml import RandomForestClassifier as cu_rf
+            from cuml import RandomForestClassifier as cu_rf, RandomForestRegressor as cu_rfr
             logging.info('RandomForest using cuda')
-            return cu_rf(**fixed_params), config
+            model_class = cu_rf if y_type == 'binary' else cu_rfr
+            return model_class(**fixed_params), config
         else:
-            # For CPU RandomForest, use scikit-learn's RandomForestClassifier
             logging.info('RandomForest using cpu')
-            return skl_rf(**fixed_params), config
-    elif model_name == 'LGBMClassifier':
+            return model_class(**fixed_params), config
+    elif model_base_name == 'lgbm':
         if device == 'cuda':
-            # For GPU RandomForest, use cuml's RandomForestClassifier
-            from cuml import RandomForestClassifier as cu_rf
+            # LightGBM can use GPU with device='gpu'
             logging.info('LGBM using cuda')
-            return cu_rf(**fixed_params), config
+            fixed_params['device'] = 'gpu'
         else:
-            # For CPU RandomForest, use scikit-learn's RandomForestClassifier
             logging.info('LGBM using cpu')
-            cb = []; fit_params = {}
-            if config.get('early_stop', False) and config.get('test_set', None) != None:
-                cb.append(multi_EarlyStopCB_wrapper(stopping_rounds=200, first_metric_only=True))
-                fit_params['classifier__eval_set'] = config.get('test_set')
-                fit_params['classifier__eval_metric'] = config.get('scoring_metric', 'f1')
-            if config.get('lr_decay', False):
-                def decay_rate(current_round):
-                    return 0.1 * (0.995 ** current_round) 
-                cb.append(lgb.reset_parameter(learning_rate=decay_rate))
-            if len(cb) > 0:
-                fit_params['classifier__callbacks'] = cb
-            config['fit_params'] = fit_params
-            config['n_cores'] = 2
-            fixed_params['n_jobs'] = max(n_cores // 2, 1)
-            fixed_params['metric'] = None
-            fixed_params['importance_type'] = 'gain'
+        
+        cb = []
+        fit_params = {}
+        if config.get('early_stop', False) and config.get('test_set', None) is not None:
+            cb.append(multi_EarlyStopCB_wrapper(stopping_rounds=200, first_metric_only=True))
+            fit_params['model__eval_set'] = config.get('test_set')
+            fit_params['model__eval_metric'] = config.get('scoring_metric', 'f1' if y_type == 'binary' else 'r2')
+        
+        if config.get('lr_decay', False):
+            def decay_rate(current_round):
+                return 0.1 * (0.995 ** current_round)
+            cb.append(lgb.reset_parameter(learning_rate=decay_rate))
+        
+        if len(cb) > 0:
+            fit_params['model__callbacks'] = cb
+        
+        config['fit_params'] = fit_params
+        config['n_cores'] = 2
+        fixed_params['n_jobs'] = max(n_cores // 2, 1)
+        fixed_params['metric'] = None
+        fixed_params['importance_type'] = 'gain'
+        if 'test_set' in config:
             config.pop('test_set')
-            return LGBMClassifier(**fixed_params), config
-    elif model_name in MODEL_TYPES:
+            
+        return model_class(**fixed_params), config
+    elif model_base_name in ['sgd']:
         # For other models, use the CPU version from MODEL_TYPES
-        model_class = MODEL_TYPES[model_name]
-        # Remove n_jobs if the model doesn't support it, as it might have been added for CPU path
+        # Remove n_jobs if the model doesn't support it
         if not hasattr(model_class(), 'n_jobs') and 'n_jobs' in fixed_params:
             fixed_params.pop('n_jobs')
         return model_class(**fixed_params), config
     else:
-        raise ValueError(f'{model_name} type not supported')
+        raise ValueError(f'{model_base_name} type not supported')
 
 
 def build_pipe(config, base_estimator):
@@ -155,7 +175,7 @@ def build_pipe(config, base_estimator):
     if scaler_flag:
         pipe_list.append(('scaling', scaler_class))
     
-    pipe_list.append(('classifier', base_estimator))
+    pipe_list.append(('model', base_estimator))
 
     pipeline_estimator = Pipeline(
             pipe_list
