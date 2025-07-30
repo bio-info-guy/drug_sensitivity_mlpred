@@ -9,10 +9,10 @@ except ImportError:
 
 # Define model names (these will be needed for validation in load_config)
 MODEL_TYPES = {
-    'XGBClassifier': None, # Placeholder, actual classes will be imported in skl_train_model.py
-    'RandomForestClassifier': None,
-    'SGDClassifier': None,
-    'LGBMClassifier': None
+    'xgb': None, # Placeholder, actual classes will be imported in skl_train_model.py
+    'randomforest': None,
+    'sgd': None,
+    'lgbm': None
 }
 
 # Define oversampler types (these will be needed for validation in load_config)
@@ -78,6 +78,10 @@ def load_config(config_file, n_cores, device):
     if config['model_type'] not in MODEL_TYPES:
         raise ValueError(f"Unsupported model type: {config['model_type']}. Supported: {list(MODEL_TYPES.keys())}")
     
+    # Ensure model_type is one of the base names (xgb, randomforest, sgd, lgbm)
+    if config['model_type'] not in ['xgb', 'randomforest', 'sgd', 'lgbm']:
+        raise ValueError(f"Invalid base model type: {config['model_type']}. Must be one of 'xgb', 'randomforest', 'sgd', 'lgbm'.")
+    
     # Validate oversampler type
     if config['use_oversampling'] and config['oversampler_type'] not in OVERSAMPLER_TYPES:
         raise ValueError(f"Unsupported oversampler type: {config['oversampler_type']}. Supported: {list(OVERSAMPLER_TYPES.keys())}")
@@ -118,7 +122,7 @@ def load_config(config_file, n_cores, device):
     config['device'] = device
     config['n_cores'] = n_cores
     #handle gpu and cpu here
-    if config.get('model_type') in ['XGBClassifier', 'RandomForestClassifier']:
+    if config.get('model_type') in ['xgb', 'randomforest', 'lgbm']: # LGBM also supports GPU
         if device == 'cuda':
             config['n_cores'] = 1
 

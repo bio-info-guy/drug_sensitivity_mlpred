@@ -156,10 +156,12 @@ def plot_regression_evaluation(best_model, X_test, y_test, target_name, output_d
         model_class= str(best_model['model']).split('(')[0]
     else:
         model_class= str(best_model).split('(')[0]
-    y_pred = model.predict(X_test)
-    
+    y_pred = best_model.predict(X_test)
+    y_test = y_test.values.flatten()
     # Calculate residuals and key metrics
     residuals = y_test - y_pred
+
+
     r2 = r2_score(y_test, y_pred)
     mae = mean_absolute_error(y_test, y_pred)
     rmse = np.sqrt(mean_squared_error(y_test, y_pred))
@@ -211,7 +213,7 @@ def plot_regression_evaluation(best_model, X_test, y_test, target_name, output_d
     fig.tight_layout(rect=[0, 0.03, 1, 0.95]) # Adjust layout to make room for suptitle
     
     # Save the figure
-    filename = os.path.join(output_dir, f'{target_name}_{model_class}_regression_evaluation.png')
+    filename = os.path.join(output_dir, target_name, f'{target_name}_{model_class}_regression_evaluation.png')
     fig.savefig(filename, dpi=150)
     print(f"✅ Regression evaluation plot saved to: {filename}")
     

@@ -13,11 +13,11 @@
     "cv_splits": 5,
     "scoring_metric": "average_precision",
     "search_method": "optuna",
-    "hpo_n_trials": 200,
+    "hpo_n_trials": 3,
     "scale_data": false,
     "early_stop": true,
     "lr_decay": true,
-    "pca": true,
+    "pca": false,
     "fixed_params": {
         "random_state": 42,
         "n_estimators":1000,

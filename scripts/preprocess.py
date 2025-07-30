@@ -1,91 +1,97 @@
 import pandas as pd
 import numpy as np
 
+
 def filter_and_threshold_data(
     X: pd.DataFrame,
-    Y: pd.DataFrame,
+    Y: pd.Series,
     option: str,
     threshold: float = None,
     quantile: float = 0.25
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+) -> tuple[pd.DataFrame, pd.Series]:
     """
-    Filters and thresholds feature (X) and label (Y) DataFrames.
+    Filters and thresholds a feature DataFrame (X) and a label Series (Y).
 
-    This function first removes rows from both X and Y where Y has any NA values.
+    This function first removes rows from both X and Y where Y has NA values.
     It then applies a specific thresholding strategy to Y based on the 'option' parameter.
 
     Args:
-        X (pd.DataFrame): DataFrame of features with shape ($n \times p$).
-        Y (pd.DataFrame): DataFrame of labels with shape ($n \times m$).
+        X (pd.DataFrame): DataFrame of features with shape ($n \\times p$).
+        Y (pd.Series): Series of labels with length $n$.
         option (str): The thresholding strategy. Must be one of:
-                      'none', 'percentage', 'quantile'.
+                      'raw', 'percentage', 'quantile'.
         threshold (float, optional): The value for the 'percentage' option. Defaults to None.
-        quantile (float, optional): The quantile for the 'quantile' option. Defaults to 0.3.
+        quantile (float, optional): The quantile for the 'quantile' option. Defaults to 0.25.
 
     Returns:
-        tuple[pd.DataFrame, pd.DataFrame]: A tuple of the processed X and Y DataFrames.
+        tuple[pd.DataFrame, pd.Series]: A tuple of the processed X DataFrame and Y Series.
     """
+    # Gracefully handle if a single-column DataFrame is passed for Y
+    if isinstance(Y, pd.DataFrame):
+        if Y.shape[1] == 1:
+            Y = Y.iloc[:, 0]  # Convert to Series
+        else:
+            raise ValueError("Y must be a pandas Series or a single-column DataFrame.")
+    
+    if not isinstance(Y, pd.Series):
+        raise TypeError("Y must be a pandas Series.")
+
     if not X.index.equals(Y.index):
         raise ValueError("❌ X and Y must have the same index for sample correspondence.")
 
     # 1. Always filter out rows where Y has any NA values
-    valid_rows_mask = Y.notna().all(axis=1)
+    valid_rows_mask = Y.notna()  # For a Series, .notna() creates the correct mask
     X_filtered = X.loc[valid_rows_mask].copy()
     Y_filtered = Y.loc[valid_rows_mask].copy()
 
     # 2. Apply the selected thresholding option
     if option == 'raw':
-        # Option 'a': Return the data with only NA filtering
         return X_filtered, Y_filtered
 
     elif option == 'percentage':
-        # Option 'b': Apply threshold if resulting positive rate is between 5% and 95%
         if threshold is None:
             raise ValueError("A 'threshold' value must be provided for the 'percentage' option.")
 
         Y_binary = Y_filtered < threshold
-        positive_rate = Y_binary.sum().sum() / Y_binary.size
+        # For a Series, a single .sum() is sufficient
+        positive_rate = Y_binary.sum() / Y_binary.size
 
         if 0.05 <= positive_rate <= 0.95:
-            return X_filtered, Y_binary  # Use the new binarized Y
+            return X_filtered, Y_binary
         else:
-            return X_filtered, Y_filtered  # Use the original Y values
+            return X_filtered, Y_filtered
 
     elif option == 'quantile':
-        # Option 'c': Binarize Y based on negative values in the lowest quantile
-        quantile_thresholds = Y_filtered.quantile(q=quantile, axis=0)
-        # The condition is broadcasted column-wise
-        Y_binary = (Y_filtered < 0) & (Y_filtered < quantile_thresholds)
+        # For a Series, .quantile() doesn't require an axis
+        quantile_threshold = Y_filtered.quantile(q=quantile)
+        Y_binary = (Y_filtered < 0) & (Y_filtered < quantile_threshold)
         return X_filtered, Y_binary
 
     else:
         raise ValueError(f"Invalid option '{option}'. Choose from 'raw', 'percentage', or 'quantile'.")
 
-
-
-def get_y_type(Y: pd.DataFrame) -> dict[str, str]:
+def get_y_type(Y: pd.Series) -> str:
     """
-    Determines if each column in a DataFrame is binary, continuous, or constant.
+    Determines if a Series is binary, continuous, or constant.
 
     Args:
-        Y (pd.DataFrame): The DataFrame of labels to analyze.
+        Y (pd.Series): The Series of labels to analyze.
 
     Returns:
-        dict[str, str]: A dictionary mapping column names to their determined data type.
+        str: The determined data type ('binary', 'continuous', or 'constant').
     """
-    if not isinstance(Y, pd.DataFrame):
-        raise TypeError("Input must be a pandas DataFrame.")
+    if not isinstance(Y, pd.Series):
+        raise TypeError("Input must be a pandas Series.")
 
-    column_types = {}
-    for col_name in Y.columns:
-        # nunique() counts distinct non-null values
-        unique_values = Y[col_name].nunique()
-        if unique_values == 2:
-            return 'binary'
-        elif unique_values > 2:
-            return 'continuous'
-        else:
-            return 'constant'
+    # nunique() counts distinct non-null values
+    unique_values = Y.nunique()
+
+    if unique_values == 2:
+        return 'binary'
+    elif unique_values > 2:
+        return 'continuous'
+    else: # This covers cases with 0 or 1 unique values
+        return 'constant'
 
 def split_train_test_data(X, y, y_type, config, cell_lines=None):
     """
@@ -146,7 +152,7 @@ def apply_pca_pipeline(X_train, X_test, y_train, config):
     """
     from imblearn.pipeline import Pipeline
     from sklearn.preprocessing import StandardScaler
-    from sklearn.decomposition import TruncatedSVD
+    from sklearn.decomposition import TruncatedSVD, PCA
     from imblearn.over_sampling import RandomOverSampler, SMOTE
 
     local_config = config.copy()
@@ -181,14 +187,15 @@ def apply_pca_pipeline(X_train, X_test, y_train, config):
         pipeline_steps.append(('scaling', StandardScaler()))
 
     # 3. PCA Step
-    n_components = local_config.get('pca_n_components', 0.99999)
-    
+    n_components = local_config.get('pca_n_components', 'all')
+    if n_components == 'all':
+        n_components = min(X_train_to_process.shape)
     if isinstance(n_components, int):
         max_components = min(X_train_to_process.shape)
         if n_components >= max_components:
             print(f"Warning: n_components ({n_components}) is >= min(n_samples, n_features) ({max_components}). "
-                  f"Adjusting to {max_components - 1}.")
-            n_components = max_components - 1
+                  f"Adjusting to {max_components}.")
+            n_components = max_components
 
     pipeline_steps.append(('pca', PCA(n_components=n_components)))
     

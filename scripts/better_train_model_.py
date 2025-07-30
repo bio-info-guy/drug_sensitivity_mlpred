@@ -18,7 +18,7 @@ from imblearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA, TruncatedSVD
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report, confusion_matrix, r2_score, mean_squared_error, mean_absolute_error, mean_gamma_deviance
+from sklearn.metrics import classification_report, confusion_matrix, r2_score, mean_squared_error, mean_absolute_error, mean_absolute_percentage_error
 from sklearn.model_selection import cross_validate
 from sklearn.model_selection import cross_val_score, KFold
 from sklearn.model_selection import StratifiedKFold
@@ -60,15 +60,15 @@ def train_drug_model(X, Y, drug, config, cell_lines=None):
     y_transform_option = config.get('y_transform_option', 'raw')
     y_transform_quantile = config.get('y_transform_quantile', 0.25)
     y_transform_percentage_threshold = config.get('y_transform_percentage_threshold', 0.5)
-    
-    X, Y = filter_and_threshold_data(
-        X, Y,
+    Y_drug = Y[drug]
+    X, y = filter_and_threshold_data(
+        X, Y_drug,
         option=y_transform_option,
         quantile=y_transform_quantile,
         threshold=y_transform_percentage_threshold
     )
     
-    y = Y[[drug]]
+    
     y_type = get_y_type(y)
     
     logging.info(f"Drug: {drug}, Y type: {y_type}")
@@ -108,7 +108,7 @@ def train_drug_model(X, Y, drug, config, cell_lines=None):
     
     # Initialize base model using the new function
     model0, config = get_model_for_device(config, y_type)
-    logging.info("This is the current config:\n" + yaml.dump(config))
+    logging.info("This is the current config:\n" + yaml.dump({c:config[c] for c in config if c != 'fit_params'}))
 
     # Handle oversampling and get the initial pipeline and resampled data
     imba_pipeline = build_pipe(config, model0)
@@ -126,14 +126,14 @@ def train_drug_model(X, Y, drug, config, cell_lines=None):
     if y_type == 'binary':
         scoring_metrics = ['balanced_accuracy', 'precision', 'average_precision', 'recall', 'f1', 'roc_auc']
     else:
-        scoring_metrics = ['r2', 'neg_mean_squared_error', 'neg_mean_absolute_error', 'neg_mean_gamma_deviance']
+        scoring_metrics = ['r2', 'neg_mean_squared_error', 'neg_mean_absolute_error', 'neg_mean_absolute_percentage_error']
 
     # Only perform nested cross validation if doing hyperparameter search to evaluate model
     if nested_cv and search_estimator is not None:
         logging.info(f"Best param found using all data for {drug}: {best_params} ")
         logging.info('Performing nested cross-validation')
         cv_results = outer_cross_validate(
-            search_estimator, X, y.values.ravel(),
+            search_estimator, X, y,
             scoring=scoring_metrics,
             cv=kfold_outer,
             config=config,
@@ -141,7 +141,7 @@ def train_drug_model(X, Y, drug, config, cell_lines=None):
         )
     else:
         cv_results = cross_validate(
-            cv_estimator, X_train, y_train.values.ravel(),
+            cv_estimator, X_train, y_train,
             scoring=scoring_metrics,
             cv=kfold_outer
         )
@@ -176,7 +176,7 @@ def train_drug_model(X, Y, drug, config, cell_lines=None):
             'r2': r2_score(y_test, y_pred),
             'mse': mean_squared_error(y_test, y_pred),
             'mae': mean_absolute_error(y_test, y_pred),
-            'gamma_deviance': mean_gamma_deviance(y_test, y_pred)
+            'mape': mean_absolute_percentage_error(y_test, y_pred)
         }
 
     return final_results

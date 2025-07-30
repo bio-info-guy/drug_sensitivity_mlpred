@@ -15,22 +15,22 @@ def calculate_feature_importance(pipeline_model, X_train, pca_object=None):
     Calculates feature importance based on model type and training data.
 
     Args:
-        pipeline_model: A Pipeline object with a 'classifier' key pointing to the model.
+        pipeline_model: A Pipeline object with a 'model' key pointing to the model.
         X_train: Training features (pandas DataFrame).
         pca_object: Optional PCA object if PCA was used for preprocessing.
 
     Returns:
         A pandas DataFrame with feature importances.
     """
-    classifier = pipeline_model.named_steps['classifier']
+    model = pipeline_model.named_steps['model']
     
     df_dict = {}
     df_dict['Feature'] = X_train.columns
     # Tree-based models
-    if hasattr(classifier, 'feature_importances_'):
+    if hasattr(model, 'feature_importances_'):
         if pca_object is not None:
             # Calculate feature importance using PCA components
-            importance = classifier.feature_importances_
+            importance = model.feature_importances_
             pc_var = pca_object.explained_variance_
             comps = pca_object.components_
             df_dict['pca_importance'] = (importance[:, np.newaxis] * np.abs(comps/X_train.std().values)).sum(axis=0)
@@ -44,7 +44,7 @@ def calculate_feature_importance(pipeline_model, X_train, pca_object=None):
             df_dict['Importance'] = df_dict['pca_importance_scaled']
             
         else:
-            df_dict['Importance'] = classifier.feature_importances_
+            df_dict['Importance'] = model.feature_importances_
 
 
         feature_importance_df = pd.DataFrame(df_dict)
@@ -52,10 +52,10 @@ def calculate_feature_importance(pipeline_model, X_train, pca_object=None):
         return feature_importance_df
     
     # Linear models
-    elif hasattr(classifier, 'coef_'):
+    elif hasattr(model, 'coef_'):
 
         feature_names = X_train.columns
-        coef = classifier.coef_[0] if classifier.coef_.ndim > 1 else classifier.coef_
+        coef = model.coef_[0] if model.coef_.ndim > 1 else model.coef_
         coef1 = np.full(len(feature_names), np.nan)
         if pca_object is not None:
             coef = np.abs(coef[:, np.newaxis] * (pca_object.components_/X_train.std().values)).sum(axis=0)
@@ -93,5 +93,5 @@ def calculate_feature_importance(pipeline_model, X_train, pca_object=None):
         return feature_importance_df
     
     else:
-        logging.warning(f"Model type {type(classifier).__name__} does not have feature_importances_ or coef_ attribute.")
+        logging.warning(f"Model type {type(model).__name__} does not have feature_importances_ or coef_ attribute.")
         return pd.DataFrame()

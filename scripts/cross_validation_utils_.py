@@ -54,7 +54,7 @@ def outer_cross_validate(estimator, X, y=None, cv=None, scoring=None, random_sta
     """
     
     # Set default cv if None
-    if get_y_type(y.to_frame() if isinstance(y, pd.Series) else y) == 'binary':
+    if get_y_type(y) == 'binary':
         cv_fun = StratifiedKFold
         classify = True
     else:

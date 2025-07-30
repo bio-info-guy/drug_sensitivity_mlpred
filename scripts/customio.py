@@ -41,6 +41,9 @@ def read_data2(xpath: str, ypath:str):
     if 'cell_line_name' in X.columns:
         cell_lines = X['cell_line_name']
         X = X.drop(columns=['cell_line_name'])
+
+    if 'cell_line_name' in y.columns:
+        y = y.drop(columns=['cell_line_name'])
     
     drug_y_all = y
     drug_list = drug_y_all.columns.tolist()
