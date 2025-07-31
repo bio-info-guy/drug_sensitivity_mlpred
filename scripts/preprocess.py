@@ -49,10 +49,10 @@ def filter_and_threshold_data(
         return X_filtered, Y_filtered
 
     elif option == 'percentage':
-        if threshold is None:
-            raise ValueError("A 'threshold' value must be provided for the 'percentage' option.")
+        if threshold is None or threshold < 0:
+            raise ValueError("A 'postive threshold' value must be provided for the 'percentage' option.")
 
-        Y_binary = Y_filtered < threshold
+        Y_binary = Y_filtered < np.log2(threshold)
         # For a Series, a single .sum() is sufficient
         positive_rate = Y_binary.sum() / Y_binary.size
 

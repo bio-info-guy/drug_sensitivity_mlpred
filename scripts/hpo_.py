@@ -87,7 +87,7 @@ def perform_hyperparameter_search(imba_pipeline, X, y, config, kfold_inner, y_ty
             cv=kfold_inner,
             scoring=scoring_metric,
             n_jobs=n_cores,
-            n_trials=3, # at least 30 trials for optuna search, hardcoded for now
+            n_trials=30, # at least 30 trials for optuna search, hardcoded for now
             verbose=2,
             callbacks=[dummy_gc]
         )
