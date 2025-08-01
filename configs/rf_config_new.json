@@ -1,0 +1,43 @@
+{
+    "model_type": "randomforest",
+    "y_transform_option": "percentage",
+    "y_transform_quantile": 0.25,
+    "y_transform_percentage_threshold": 0.5,
+    "use_oversampling": false,
+    "oversampler_type": "SMOTE",
+    "oversampler_seed": 42,
+    "train_test_split_seed": 20,
+    "train_test_split_ratio": 0.2,
+    "test_cell_lines": ["CAL27", "HSC2", "SCC25"],
+    "cv_seed": 7,
+    "cv_splits": 5,
+    "scoring_metric": "average_precision",
+    "search_method": "optuna",
+    "hpo_n_trials": 3,
+    "scale_data": false,
+    "early_stop": false,
+    "lr_decay": false,
+    "pca": true,
+    "fixed_params": {
+        "random_state": 42,
+        "class_weight": "balanced"
+    },
+    "grid_search_params": {
+        "n_estimators": [100, 200, 300],
+        "max_depth": [10, 20, null],
+        "min_samples_split": [2, 5, 10]
+    },
+    "halving_search_params": {
+        "n_estimators": [100, 200, 300, 400],
+        "max_depth": [5, 10, 20, 30, null],
+        "min_samples_split": [2, 5, 10, 20],
+        "min_samples_leaf": [1, 2, 4]
+    },
+    "optuna_search_params": {
+        "n_estimators": "optuna.distributions.IntDistribution(100, 1000)",
+        "max_depth": "optuna.distributions.IntDistribution(5, 100)",
+        "min_samples_split": "optuna.distributions.IntDistribution(2, 20)",
+        "min_samples_leaf": "optuna.distributions.IntDistribution(1, 10)",
+        "max_features": "optuna.distributions.CategoricalDistribution(['sqrt', 'log2', 1.0])"
+    }
+}

@@ -67,7 +67,7 @@ def get_model_for_device(config, y_type):
     device = config.get('device', 'cpu')  # Default to CPU if not specified
     # Determine if the task is classification or regression
     classification_metrics = ['balanced_accuracy', 'precision', 'average_precision', 'recall', 'f1', 'roc_auc']
-    regression_metrics = ['r2',  'neg_mean_absolute_error', 'neg_root_mean_squared_error','neg_mean_absolute_percentage_error']
+    regression_metrics = ['r2',  'neg_mean_absolute_error', 'neg_root_mean_squared_error','neg_mean_absolute_percentage_error', r2_scorer]
 
 
     if y_type == 'binary':
@@ -116,20 +116,24 @@ def get_model_for_device(config, y_type):
     if model_base_name == 'xgb':
         if device == 'cuda':
             logging.info('XGBoost using cuda')
-            return model_class(device='cuda', tree_method='hist', **fixed_params), config
+            #return model_class(device='cuda', tree_method='hist', **fixed_params), config
         else:
             logging.info('XGBoost using cpu')
             config['n_cores'] = 2
-            return model_class(**fixed_params), config
+            #return model_class(**fixed_params), config
+        
     elif model_base_name == 'randomforest':
         if device == 'cuda':
             from cuml import RandomForestClassifier as cu_rf, RandomForestRegressor as cu_rfr
             logging.info('RandomForest using cuda')
             model_class = cu_rf if y_type == 'binary' else cu_rfr
-            return model_class(**fixed_params), config
+            #return model_class(**fixed_params), config
         else:
+            fixed_params['n_jobs'] = max(n_cores // 2, 1)
+            config['n_cores'] = 2
             logging.info('RandomForest using cpu')
-            return model_class(**fixed_params), config
+            #return model_class(**fixed_params), config
+        
     elif model_base_name == 'lgbm':
         if device == 'cuda':
             # LightGBM can use GPU with device='gpu'
@@ -161,17 +165,22 @@ def get_model_for_device(config, y_type):
         if 'test_set' in config:
             config.pop('test_set')
             
-        return model_class(**fixed_params), config
+        #return model_class(**fixed_params), config
     
     elif model_base_name in ['sgd']:
         # For other models, use the CPU version from MODEL_TYPES
         # Remove n_jobs if the model doesn't support it
         if not hasattr(model_class(), 'n_jobs') and 'n_jobs' in fixed_params:
             fixed_params.pop('n_jobs')
-        return model_class(**fixed_params), config
+        #return model_class(**fixed_params), config
+    
     else:
         raise ValueError(f'{model_base_name} type not supported')
-
+    
+    if 'test_set' in config:
+            config.pop('test_set')
+            
+    return model_class(**fixed_params), config
 
 def build_pipe(config, base_estimator):
 

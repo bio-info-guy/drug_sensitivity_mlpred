@@ -1,0 +1,36 @@
+model_type: "SGDClassifier"
+y_transform_option: "percentage"
+y_transform_quantile: 0.25
+y_transform_percentage_threshold: 0.5
+use_oversampling: false
+oversampler_type: "SMOTE"
+oversampler_seed: 42
+train_test_split_seed: 20
+train_test_split_ratio: 0.2
+test_cell_lines: ["CAL27", "HSC2", "SCC25"]
+cv_seed: 7
+cv_splits: 5
+scoring_metric: "average_precision"
+search_method: "optuna"
+hpo_n_trials: 200
+scale_data: false
+early_stop: false
+lr_decay: false
+pca: true
+fixed_params:
+  random_state: 42
+  loss: "log_loss"
+  penalty: "elasticnet"
+  class_weight: "balanced"
+grid_search_params:
+  l1_ratio:  [0.1, 0.5, 0.9]
+  alpha: [0.0001, 0.001, 0.01]
+  max_iter: [1000, 2000]
+halving_search_params:
+  l1_ratio: "uniform(0.0, 1.0)"
+  alpha: "lognorm(0.0, 1.0)"
+  max_iter: [1000, 1500, 2000, 2500]
+optuna_search_params:
+  l1_ratio: "optuna.distributions.FloatDistribution(0.0, 1.0)"
+  alpha: "optuna.distributions.FloatDistribution(1e-5, 1e-1, log=True)"
+  max_iter: "optuna.distributions.IntDistribution(1000, 4000)"

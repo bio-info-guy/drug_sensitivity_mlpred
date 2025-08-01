@@ -123,7 +123,8 @@ def outer_cross_validate(estimator, X, y=None, cv=None, scoring=None, random_sta
             X_train, X_test, y_train, pca_model = apply_pca_pipeline(X_train, X_test, y_train, config)
 
         # Fit the estimator and measure training time
-        fit_params['model__eval_set'] = [(X_test, y_test)]
+        if config and config.get('early_stop', False):
+            fit_params['model__eval_set'] = [(X_test, y_test)]
         start_fit_time = time.time()
 
         estimator_fold.fit(X_train, y_train, **fit_params)
